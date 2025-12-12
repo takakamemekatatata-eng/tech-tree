@@ -1,2 +1,45 @@
-<div id="cy" style="width:100%; height:100vh;"></div>
+<header class="app-header">
+  <div class="header-inner">
+    <div class="left-area">
+      <div class="logo">Techtree</div>
+      <div class="toolbar">
+        <button class="btn" (click)="fit()">Fit</button>
+        <button class="btn" (click)="zoomIn()">＋</button>
+        <button class="btn" (click)="zoomOut()">－</button>
+        <button class="btn" (click)="switchLayout()">Layout</button>
+        <button class="btn" (click)="clearSelection()">Clear</button>
+        <button class="btn" (click)="toggleSidebar()" title="Toggle details">≡</button>
+      </div>
+    </div>
+
+    <div class="search-container">
+      <input type="text" placeholder="検索..." aria-label="search" (input)="applySearch($event.target.value)" />
+    </div>
+  </div>
+</header>
+
+<div class="app-body">
+  <aside class="details" [class.collapsed]="sidebarCollapsed" id="details">
+    <div class="details-header">
+      <strong>Details</strong>
+    </div>
+
+    <div class="details-body">
+      <ng-container *ngIf="selectedNode; else emptyDetails">
+        <div class="detail-row"><strong>Label:</strong> {{ selectedNode?.label }}</div>
+        <div class="detail-row"><strong>Category:</strong> {{ selectedNode?.category }}</div>
+        <div class="detail-row"><strong>Level:</strong> {{ selectedNode?.level }}</div>
+      </ng-container>
+
+      <ng-template #emptyDetails>
+        <div class="empty">Select a node to view details</div>
+      </ng-template>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <!-- cytoscape container -->
+    <div id="cy"></div>
+  </main>
+</div>
 

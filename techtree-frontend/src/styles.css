@@ -1,1 +1,12 @@
-/* You can add global styles to this file, and also import other style files */
+/* グローバル土台 */
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+/* app-root は必ずここ */
+app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
