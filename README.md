@@ -1,22 +1,16 @@
-# tech-tree
-Tech tree tool
+## Overview
+TechTree is a skill visualization app using graph structure.
 
-# How to run
+## Tech Stack
+- Frontend: Angular, Cytoscape.js
+- Backend: Django REST Framework
+- DB: PostgreSQL
 
-## front
-### 初回のみ
-npm install -g @angular/cli
-
-### 毎回実行
-cd techtree-frontend
+## How to Run
+(frontend)
 npm install
 ng serve
-npm start
-http://localhost:4200/
 
-## back
-cd techtree-backend
+(backend)
 pip install -r requirements.txt
-
 python manage.py runserver
-
