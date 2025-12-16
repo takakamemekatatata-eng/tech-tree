@@ -1,3 +1,6 @@
+/* import shared variables */
+@import './style-variables.css';
+
 /* =========================
    グローバル土台（超重要）
    ========================= */
@@ -10,15 +13,6 @@ app-root {
   display: flex;
   flex-direction: column;
   height: 100vh;
-}
-
-/* =========================
-   変数
-   ========================= */
-:root {
-  --header-height: 64px;
-  --sidebar-width: 280px;
-  --accent: #4A90E2;
 }
 
 /* =========================
