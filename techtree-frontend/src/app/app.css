@@ -118,3 +118,34 @@ app-root {
   height: 100%;
   background: #fafafa;
 }
+
+.level-controls {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.level-controls input[type="number"] {
+  width: 64px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+
+.btn.small {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.save-message {
+  margin-top: 6px;
+  color: #2f9e44; /* green for success; changes to red on failure via content */
+  font-size: 13px;
+}
+
+/* error variant for save messages */
+.save-message.error {
+  color: #e03131;
+}

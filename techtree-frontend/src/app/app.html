@@ -26,9 +26,21 @@
 
     <div class="details-body">
       <ng-container *ngIf="selectedNode; else emptyDetails">
+        <div class="detail-row"><strong>ID:</strong> {{ selectedNode?.id }}</div>
         <div class="detail-row"><strong>Label:</strong> {{ selectedNode?.label }}</div>
         <div class="detail-row"><strong>Category:</strong> {{ selectedNode?.category }}</div>
-        <div class="detail-row"><strong>Level:</strong> {{ selectedNode?.level }}</div>
+
+        <!-- replaced static Level display with editable UI -->
+        <div class="detail-row">
+          <strong>Level:</strong>
+          <div class="level-controls">
+            <button class="btn small" (click)="decrementLevel()" title="Decrease">－</button>
+            <input type="number" [value]="selectedLevel" (input)="onLevelInput($event.target.value)" min="1" />
+            <button class="btn small" (click)="incrementLevel()" title="Increase">＋</button>
+            <button class="btn" (click)="saveLevel()" [disabled]="isSavingLevel || selectedLevel === selectedNode?.level">Save</button>
+          </div>
+          <div class="save-message" *ngIf="saveMessage" [class.error]="saveError">{{ saveMessage }}</div>
+        </div>
       </ng-container>
 
       <ng-template #emptyDetails>

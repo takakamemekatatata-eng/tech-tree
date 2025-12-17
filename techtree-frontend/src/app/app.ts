@@ -1,9 +1,10 @@
-import { Component, OnInit, AfterViewInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import axios from 'axios';
 import { layoutConfig, levelNodeConfig, mainLabelConfig } from './visual-config';
+import { environment } from '../environments/environment';
 
 cytoscape.use(dagre);
 
@@ -31,6 +32,9 @@ export class AppComponent implements OnInit, AfterViewInit {
    readonly layoutConfig = layoutConfig;
    readonly levelNodeConfig = levelNodeConfig;
    readonly mainLabelConfig = mainLabelConfig;
+
+   // inject ChangeDetectorRef and NgZone so Cytoscape callbacks can update Angular view
+   constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
 
    // Helper: return layout options for a layout name
    getLayoutOptions(layoutName?: string) {
@@ -266,12 +270,17 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.cy.on('tap', 'node:not(.level-node)', (evt: any) => {
       const node = evt.target;
       const data = node.data();
-      this.clearNodeSelection();
-      node.addClass('selected');
-      this.selectedNode = { ...data };
-      this.sidebarCollapsed = false;
+      // Cytoscape events run outside Angular zone: ensure UI updates happen inside Angular zone
+      this.ngZone.run(() => {
+        this.clearNodeSelection();
+        node.addClass('selected');
+        this.selectedNode = { ...data };
+        this.selectedLevel = Number(data.level ?? 1);
+        this.sidebarCollapsed = false;
+        this.cdr.detectChanges();
+      });
     });
- 
+
     // When a level node is tapped, behave as if its parent was tapped
     this.cy.on('tap', 'node.level-node', (evt: any) => {
       const lvl = evt.target;
@@ -279,10 +288,14 @@ export class AppComponent implements OnInit, AfterViewInit {
       if (!parentId) return;
       const parent = this.cy.getElementById(parentId);
       if (parent && parent.length > 0) {
-        this.clearNodeSelection();
-        parent.addClass('selected');
-        this.selectedNode = { ...parent.data() };
-        this.sidebarCollapsed = false;
+        this.ngZone.run(() => {
+          this.clearNodeSelection();
+          parent.addClass('selected');
+          this.selectedNode = { ...parent.data() };
+          this.selectedLevel = Number(parent.data('level') ?? 1);
+          this.sidebarCollapsed = false;
+          this.cdr.detectChanges();
+        });
       }
     });
  
@@ -474,6 +487,11 @@ export class AppComponent implements OnInit, AfterViewInit {
     if (!this.cy) return;
     this.clearNodeSelection();
     this.selectedNode = null;
+    this.selectedLevel = null;
+    this.saveMessage = '';
+    this.saveError = false;
+    // ensure UI immediately reflects cleared state
+    this.ngZone.run(() => this.cdr.detectChanges());
   }
 
   clearNodeSelection() {
@@ -483,6 +501,93 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   toggleSidebar() {
     this.sidebarCollapsed = !this.sidebarCollapsed;
+  }
+
+  // for level editing
+  selectedLevel: number | null = null;
+  isSavingLevel = false;
+  saveMessage = '';
+  saveError = false;
+
+  // Called when user edits the number field
+  onLevelInput(value: string | number) {
+    const v = Number(value);
+    if (Number.isFinite(v) && v >= 1) {
+      this.selectedLevel = Math.floor(v);
+    }
+  }
+
+  incrementLevel() {
+    if (this.selectedLevel == null) this.selectedLevel = 1;
+    this.selectedLevel = this.selectedLevel + 1;
+  }
+
+  decrementLevel() {
+    if (this.selectedLevel == null) this.selectedLevel = 1;
+    this.selectedLevel = Math.max(1, this.selectedLevel - 1);
+  }
+
+  // Save updated level to backend and update cytoscape elements
+  async saveLevel() {
+    if (!this.selectedNode || this.selectedLevel == null) return;
+    this.saveError = false;
+    // extract numeric id from data id like 'skill-12'
+    const dataId: string = this.selectedNode.id ?? this.selectedNode['id'];
+    const match = String(dataId).match(/^skill-(\d+)$/);
+    if (!match) {
+      this.saveMessage = 'Invalid node id';
+      this.saveError = true;
+      setTimeout(() => (this.saveMessage = ''), 2000);
+      return;
+    }
+    const skillId = match[1];
+
+    try {
+      this.isSavingLevel = true;
+      this.saveMessage = 'Saving...';
+
+      // PATCH backend (assumes endpoint exists at /skills/<id>/)
+      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, { level: this.selectedLevel });
+
+      // update selectedNode state
+      this.selectedNode.level = this.selectedLevel;
+
+      // update main cytoscape node's data to reflect new level (affects mapData sizing)
+      const mainNode = this.cy.getElementById(`skill-${skillId}`);
+      if (mainNode && mainNode.length > 0) {
+        mainNode.data('level', this.selectedLevel);
+      }
+
+      // update the corresponding level-node label
+      const levelNode = this.cy.getElementById(`skill-${skillId}-level`);
+      if (levelNode && levelNode.length > 0) {
+        levelNode.data('label', `Lv.${this.selectedLevel}`);
+        levelNode.data('level', this.selectedLevel);
+      }
+
+      // schedule a small layout-update/resize so visual changes are visible
+      requestAnimationFrame(() => {
+        try {
+          if (this.cy) {
+            this.cy.resize();
+            // no full layout to avoid repositioning; fit to keep viewport consistent
+            this.fit();
+            this.positionLevelNodes();
+          }
+        } catch {}
+      });
+
+      this.saveMessage = 'Saved';
+      this.saveError = false;
+      setTimeout(() => (this.saveMessage = ''), 2000);
+    } catch (err) {
+      console.error('Failed to save level', err);
+      this.saveMessage = 'Save failed';
+      this.saveError = true;
+      setTimeout(() => (this.saveMessage = ''), 3000);
+    } finally {
+      this.isSavingLevel = false;
+    }
   }
 }
 

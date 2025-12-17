@@ -79,3 +79,8 @@ TechTree はスキル間の依存関係を可視化する Web アプリケーシ
 
 目的: シンプルな箇条書きにしておき、議論・実装へつなげやすくします。  
 例やテンプレートは `docs/IDEAS.md` を参照してください。
+
+## Backend API (Draft)
+API はまだ実装されていませんが、フロントエンドは下記の API 仕様を前提に動作します。実装時は `docs/API.md` を参照してください（`GET /skills/`, `PATCH /skills/{id}/` など）。
+- Spec: docs/API.md
+- Note: `PATCH /skills/{id}/` は Details の level 編集で使用します（`{ "level": <number> }`）。
