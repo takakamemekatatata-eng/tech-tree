@@ -262,14 +262,28 @@ export class AppComponent implements OnInit, AfterViewInit {
       repositionAttached(evt.target);
     });
  
-    // Node click => populate details
-    this.cy.on('tap', 'node', (evt: any) => {
+    // Node click => populate details (only for main nodes)
+    this.cy.on('tap', 'node:not(.level-node)', (evt: any) => {
       const node = evt.target;
       const data = node.data();
       this.clearNodeSelection();
       node.addClass('selected');
       this.selectedNode = { ...data };
       this.sidebarCollapsed = false;
+    });
+ 
+    // When a level node is tapped, behave as if its parent was tapped
+    this.cy.on('tap', 'node.level-node', (evt: any) => {
+      const lvl = evt.target;
+      const parentId = lvl.data('attachedTo');
+      if (!parentId) return;
+      const parent = this.cy.getElementById(parentId);
+      if (parent && parent.length > 0) {
+        this.clearNodeSelection();
+        parent.addClass('selected');
+        this.selectedNode = { ...parent.data() };
+        this.sidebarCollapsed = false;
+      }
     });
  
     // Click background to clear selection
@@ -363,10 +377,11 @@ export class AppComponent implements OnInit, AfterViewInit {
       this.cy.elements().remove();
       this.cy.add(elements);
 
-      // make level nodes ungrabify (prevent direct dragging)
+      // make level nodes ungrabify (prevent direct dragging) and unselectify (prevent direct selection)
       this.cy.nodes('.level-node').forEach((lvl: any) => {
         try {
           if ((lvl as any).ungrabify) (lvl as any).ungrabify();
+          if ((lvl as any).unselectify) (lvl as any).unselectify();
         } catch {
           // ignore
         }
