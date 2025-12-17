@@ -99,8 +99,8 @@ export class AppComponent implements OnInit, AfterViewInit {
      // Initialize cytoscape after the view is available
      this.initCytoscape();
 
-     // If data already fetched, add elements
-     if (this.elements && this.elements.length > 0) {
+     // If data already fetched (even if empty array), add elements so demo fallback renders when empty
+     if (this.elements) {
        this.addElementsToCytoscape(this.elements);
      }
    }
@@ -535,16 +535,25 @@ export class AppComponent implements OnInit, AfterViewInit {
     const dataId: string = this.selectedNode.id ?? this.selectedNode['id'];
     const match = String(dataId).match(/^skill-(\d+)$/);
     if (!match) {
-      this.saveMessage = 'Invalid node id';
-      this.saveError = true;
+      // run inside zone so UI updates immediately
+      this.ngZone.run(() => {
+        this.saveMessage = 'Invalid node id';
+        this.saveError = true;
+        this.cdr.detectChanges();
+      });
       setTimeout(() => (this.saveMessage = ''), 2000);
       return;
     }
     const skillId = match[1];
 
     try {
-      this.isSavingLevel = true;
-      this.saveMessage = 'Saving...';
+      // ensure UI shows "Saving..." immediately
+      this.ngZone.run(() => {
+        this.isSavingLevel = true;
+        this.saveMessage = 'Saving...';
+        this.saveError = false;
+        this.cdr.detectChanges();
+      });
 
       // PATCH backend (assumes endpoint exists at /skills/<id>/)
       await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, { level: this.selectedLevel });
@@ -577,14 +586,23 @@ export class AppComponent implements OnInit, AfterViewInit {
         } catch {}
       });
 
-      this.saveMessage = 'Saved';
-      this.saveError = false;
-      setTimeout(() => (this.saveMessage = ''), 2000);
+      // update UI inside Angular zone so it reflects immediately
+      this.ngZone.run(() => {
+        this.isSavingLevel = false;
+        this.saveMessage = 'Saved';
+        this.saveError = false;
+        this.cdr.detectChanges();
+      });
+      setTimeout(() => this.ngZone.run(() => (this.saveMessage = '')), 2000);
     } catch (err) {
       console.error('Failed to save level', err);
-      this.saveMessage = 'Save failed';
-      this.saveError = true;
-      setTimeout(() => (this.saveMessage = ''), 3000);
+      this.ngZone.run(() => {
+        this.isSavingLevel = false;
+        this.saveMessage = 'Save failed';
+        this.saveError = true;
+        this.cdr.detectChanges();
+      });
+      setTimeout(() => this.ngZone.run(() => (this.saveMessage = '')), 3000);
     } finally {
       this.isSavingLevel = false;
     }

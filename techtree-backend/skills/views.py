@@ -1,83 +1,52 @@
-# Create your views here.
+from rest_framework import viewsets, mixins, status
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
 from .models import Skill
 from .serializers import SkillSerializer
-from rest_framework.views import APIView
-from rest_framework.response import Response
 
-class SkillListAPIView(APIView):
-    def get(self, request):
-        data = [
-            {
-                "id": 1,
-                "name": "Python",
-                "level": 4,
-                "category": "Backend",
-                'parent_id': None
-            },
-            {
-                "id": 2,
-                "name": "Django",
-                "level": 3,
-                "category": "Backend",
-                'parent_id': 1
-            },
-            {
-                "id": 3,
-                "name": "Flask",
-                "level": 2,
-                "category": "Backend",
-                'parent_id': 1
-            },
-            {
-                "id": 4,
-                "name": "REST API Design",
-                "level": 3,
-                "category": "Backend",
-                'parent_id': None
-            },
-            {
-                "id": 5,
-                "name": "Angular",
-                "level": 2,
-                "category": "Frontend",
-                'parent_id': 7
-            },
-            {
-                "id": 6,
-                "name": "TypeScript",
-                "level": 3,
-                "category": "Frontend",
-                'parent_id': 5
-            },
-            {
-                "id": 7,
-                "name": "HTML / CSS",
-                "level": 4,
-                "category": "Frontend",
-                'parent_id': None
-            },
-            {
-                "id": 8,
-                "name": "PostgreSQL",
-                "level": 3,
-                "category": "Backend",
-                'parent_id': None
-            },
-            {
-                "id": 9,
-                "name": "Docker",
-                "level": 2,
-                "category": "Infra",
-                'parent_id': 10
-            },
-            {
-                "id": 10,
-                "name": "Linux",
-                "level": 3,
-                "category": "Infra",
-                'parent_id': None
-            }
-        ]
 
-        return Response(data)
+class SkillViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet
+):
+    """
+    GET    /skills/        -> list skills
+    GET    /skills/{id}/   -> retrieve skill
+    PATCH  /skills/{id}/   -> update skill (level only)
+    """
+
+    queryset = Skill.objects.all().order_by('id')
+    serializer_class = SkillSerializer
+    permission_classes = [AllowAny]
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Only allow updating `level`
+        """
+        instance = self.get_object()
+        data = request.data or {}
+
+        if 'level' not in data:
+            return Response(
+                {'detail': 'Only `level` can be updated.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            level = int(data['level'])
+            if level < 1:
+                raise ValueError()
+        except Exception:
+            return Response(
+                {'level': ['Must be integer >= 1']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        instance.level = level
+        instance.save(update_fields=['level'])
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)

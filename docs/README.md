@@ -84,3 +84,16 @@ TechTree はスキル間の依存関係を可視化する Web アプリケーシ
 API はまだ実装されていませんが、フロントエンドは下記の API 仕様を前提に動作します。実装時は `docs/API.md` を参照してください（`GET /skills/`, `PATCH /skills/{id}/` など）。
 - Spec: docs/API.md
 - Note: `PATCH /skills/{id}/` は Details の level 編集で使用します（`{ "level": <number> }`）。
+
+## Database setup (追加)
+簡易セットアップスクリプトを追加しました: `scripts/db/setup_db.sh`
+
+例:
+- スーパーユーザでパスワード不要な環境（Unix の postgres ユーザ等）
+  - sudo -u postgres ./scripts/db/setup_db.sh
+- スーパーユーザにパスワードが必要な場合（環境変数で指定）
+  - PG_SUPERUSER_PASSWORD=yourpass ./scripts/db/setup_db.sh
+- ユーザ名 / DB / パスワードを上書きしたい場合
+  - DB_USER=myuser DB_PASSWORD=mypass DB_NAME=mydb ./scripts/db/setup_db.sh
+
+スクリプトは idempotent（既存のロール・DB があれば作成をスキップ）で、スキーマ・テーブル（`techtree.skills`）と簡易シードを作成します。
