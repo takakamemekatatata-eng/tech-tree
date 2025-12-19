@@ -13,7 +13,31 @@
     </div>
 
     <div class="search-container">
-      <input type="text" placeholder="検索..." aria-label="search" (input)="applySearch($event.target.value)" />
+      <div class="search-controls">
+        <input type="text" placeholder="検索..." aria-label="search" (input)="applySearch($any($event.target).value)" />
+
+        <div class="filters">
+          <label class="filter">
+            <span>レベル</span>
+            <select [value]="levelFilter" (change)="onLevelFilterChange($any($event.target).value)">
+              <option value="all">All Levels</option>
+              <option *ngFor="let l of levelOptions" [value]="l">
+                Lv.{{ l }}
+              </option>
+            </select>
+          </label>
+
+          <label class="filter">
+            <span>カテゴリ</span>
+            <select [value]="categoryFilter" (change)="onCategoryFilterChange($any($event.target).value)">
+              <option value="all">All Categories</option>
+              <option *ngFor="let c of categoryOptions" [value]="c">
+                {{ c }}
+              </option>
+            </select>
+          </label>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -37,7 +61,8 @@
             <button class="btn small" (click)="decrementLevel()" title="Decrease">－</button>
             <input type="number" [value]="selectedLevel" (input)="onLevelInput($event.target.value)" min="1" />
             <button class="btn small" (click)="incrementLevel()" title="Increase">＋</button>
-            <button class="btn" (click)="saveLevel()" [disabled]="isSavingLevel || selectedLevel === selectedNode?.level">Save</button>
+            <button class="btn" (click)="saveLevel()"
+              [disabled]="isSavingLevel || selectedLevel === selectedNode?.level">Save</button>
           </div>
           <div class="save-message" *ngIf="saveMessage" [class.error]="saveError">{{ saveMessage }}</div>
         </div>
@@ -54,4 +79,3 @@
     <div id="cy"></div>
   </main>
 </div>
-

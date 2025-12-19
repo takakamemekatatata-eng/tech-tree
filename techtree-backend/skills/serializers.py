@@ -12,4 +12,3 @@ class SkillSerializer(serializers.ModelSerializer):
         if value is None or value < 1:
             raise serializers.ValidationError('level must be an integer >= 1')
         return value
-

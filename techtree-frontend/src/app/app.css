@@ -68,20 +68,48 @@ app-root {
   max-width: 640px;
 }
 
-.search-container input {
+
+.search-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.search-container input,
+.search-container select {
   width: 100%;
   padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid #ddd;
 }
 
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.filter select {
+  width: auto;
+  min-width: 140px;
+}
+
+
 /* =========================
    Body（ここが肝）
    ========================= */
 .app-body {
-  flex: 1;              /* ← header以外の全高 */
+  flex: 1;
   display: flex;
-  overflow: hidden;     /* ← cy用 */
+  overflow: hidden;
+  min-height: 0;   /* ← これが決定打 */
 }
 
 /* =========================
@@ -107,8 +135,9 @@ app-root {
    Main / Cytoscape
    ========================= */
 .main-area {
-  flex: 1;              /* ← 横も縦も残り全部 */
-  position: relative;   /* ← cy の基準 */
+  flex: 1;
+  position: relative;
+  min-height: 0;
 }
 
 #cy {

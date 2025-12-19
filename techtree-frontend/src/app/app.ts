@@ -16,38 +16,49 @@ cytoscape.use(dagre);
   styleUrls: ['./app.css']
 })
 export class AppComponent implements OnInit, AfterViewInit {
-   cy: any = null;
-   selectedNode: any = null;
-   searchTerm = '';
-   sidebarCollapsed = false;
-   layoutName = 'dagre'; 
-   //layoutName = 'breadthfirst';
- 
-   elements: any[] = []; // store node + edge elements until cy is initialized
+  cy: any = null;
+  selectedNode: any = null;
+  searchTerm = '';
+  levelFilter = 'all';
+  categoryFilter = 'all';
+  levelOptions: number[] = [];
+  categoryOptions: string[] = [];
+  sidebarCollapsed = false;
+  layoutName = 'dagre';
+  //layoutName = 'breadthfirst';
 
-   // --------------------------
-   // Centralized layout config
-   // --------------------------
-   // replaced inline definitions with imported configs
-   readonly layoutConfig = layoutConfig;
-   readonly levelNodeConfig = levelNodeConfig;
-   readonly mainLabelConfig = mainLabelConfig;
+  elements: any[] = []; // store node + edge elements until cy is initialized
 
-   // inject ChangeDetectorRef and NgZone so Cytoscape callbacks can update Angular view
-   constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
+  // --------------------------
+  // Centralized layout config
+  // --------------------------
+  // replaced inline definitions with imported configs
+  readonly layoutConfig = layoutConfig;
+  readonly levelNodeConfig = levelNodeConfig;
+  readonly mainLabelConfig = mainLabelConfig;
 
-   // Helper: return layout options for a layout name
-   getLayoutOptions(layoutName?: string) {
-     const name = layoutName ?? this.layoutName;
-     // Use `any` to avoid typing issues with cytoscape layout typed options
-     return (this.layoutConfig as any)[name] ?? (this.layoutConfig as any).dagre;
-   }
+  // inject ChangeDetectorRef and NgZone so Cytoscape callbacks can update Angular view
+  constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) { }
 
-   async ngOnInit() {
-     try {
-       const response = await axios.get('http://localhost:8000/skills/');
-       const skills = response.data;
-       console.log('skills fetched', skills?.length);
+  // Helper: return layout options for a layout name
+  getLayoutOptions(layoutName?: string) {
+    const name = layoutName ?? this.layoutName;
+    // Use `any` to avoid typing issues with cytoscape layout typed options
+    return (this.layoutConfig as any)[name] ?? (this.layoutConfig as any).dagre;
+  }
+
+  async ngOnInit() {
+    try {
+      const response = await axios.get('http://localhost:8000/skills/');
+      const skills = response.data;
+      console.log('skills fetched', skills?.length);
+
+      const categorySet = new Set<string>();
+      const levelSet = new Set<number>();
+      skills.forEach((s: any) => {
+        if (s?.category) categorySet.add(s.category);
+        if (Number.isFinite(s?.level)) levelSet.add(Number(s.level));
+      });
 
       // create main nodes and separate "level nodes" that are children (data.parent set to main node id)
       const nodeElements = skills.map((s: any) => ({
@@ -70,7 +81,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         },
         classes: 'level-node'
       }));
- 
+
       const edgeElements = skills
         .filter((s: any) => s.parent_id !== null && s.parent_id !== undefined && s.parent_id !== s.id)
         .map((s: any) => ({
@@ -80,44 +91,47 @@ export class AppComponent implements OnInit, AfterViewInit {
             target: `skill-${s.id}`
           }
         }));
- 
+
       // assemble nodes + level nodes + edges
       this.elements = [...nodeElements, ...levelNodes, ...edgeElements];
-       console.log('built elements', this.elements.length);
- 
-       // If cytoscape is already initialized (e.g., data arrives after view init), add elements
-       if (this.cy) {
-         this.addElementsToCytoscape(this.elements);
-       }
-     } catch (error) {
-       console.error('Failed to fetch skills', error);
-       this.elements = [];
-     }
-   }
+      console.log('built elements', this.elements.length);
 
-   ngAfterViewInit() {
-     // Initialize cytoscape after the view is available
-     this.initCytoscape();
+      this.categoryOptions = Array.from(categorySet).sort();
+      this.levelOptions = Array.from(levelSet).sort((a, b) => a - b);
 
-     // If data already fetched (even if empty array), add elements so demo fallback renders when empty
-     if (this.elements) {
-       this.addElementsToCytoscape(this.elements);
-     }
-   }
+      // If cytoscape is already initialized (e.g., data arrives after view init), add elements
+      if (this.cy) {
+        this.addElementsToCytoscape(this.elements);
+      }
+    } catch (error) {
+      console.error('Failed to fetch skills', error);
+      this.elements = [];
+    }
+  }
 
-   initCytoscape() {
-     const container = document.getElementById('cy');
-     if (!container) {
-       console.error('cy container not found');
-       return;
-     }
+  ngAfterViewInit() {
+    // Initialize cytoscape after the view is available
+    this.initCytoscape();
 
-     console.log('cy container size', container.clientWidth, container.clientHeight);
+    // If data already fetched (even if empty array), add elements so demo fallback renders when empty
+    if (this.elements) {
+      this.addElementsToCytoscape(this.elements);
+    }
+  }
 
-     this.cy = cytoscape({
-        container,
-        elements: [],
-        style: [
+  initCytoscape() {
+    const container = document.getElementById('cy');
+    if (!container) {
+      console.error('cy container not found');
+      return;
+    }
+
+    console.log('cy container size', container.clientWidth, container.clientHeight);
+
+    this.cy = cytoscape({
+      container,
+      elements: [],
+      style: [
         // Main node style (shows skill name)
         {
           selector: 'node:not(.level-node)',
@@ -154,77 +168,90 @@ export class AppComponent implements OnInit, AfterViewInit {
             'height': '14px'
           }
         },
-         {
-           selector: 'edge',
-           style: {
-             'curve-style': 'bezier',
-             'width': 2,
-             'line-color': '#999',
-             'target-arrow-shape': 'triangle',
-             'target-arrow-color': '#999'
-           }
-         },
-         {
-           selector: 'node[category = "Backend"]',
-           style: { 'background-color': '#4A90E2' }
-         },
-         {
-           selector: 'node[category = "Frontend"]',
-           style: { 'background-color': '#50C878' }
-         },
-         {
-           selector: 'node[category = "Infra"]',
-           style: { 'background-color': '#F5A623' }
-         },
-         // searched/highlight/faded styles
-         {
-           selector: 'node.searched',
-           style: {
-             'border-width': 3,
-             'border-color': '#FFD54F',
-             'background-color': '#fff',
-             'width': 'mapData(level, 1, 5, 90, 180)'
-           }
-         },
-         {
-           // only apply highlight sizing to main nodes (exclude level nodes)
-           selector: 'node.selected',
-           style: {
-             'border-width': 4,
-             'border-color': '#FF5A5F',
-             'background-color': '#ffffff',
-             'width': 'mapData(level, 1, 5, 100, 200)'
-           }
-         },
-       ],
-       // Use centralized options
-       layout: (this.getLayoutOptions(this.layoutName) as any)
-     });
- 
-     // Ensure we perform a resize/fit after layout stops, which is more reliable
-     this.cy.on('layoutstop', () => {
-       console.log('layoutstop:', {
-         nodes: this.cy.nodes().length,
-         containerWidth: container.clientWidth,
-         containerHeight: container.clientHeight,
-         bbox: this.cy.elements().boundingBox()
-       });
-       // schedule a resize and fit in the next animation frame
-       requestAnimationFrame(() => {
-         try {
-           this.cy.resize();
-           this.fit();
-           this.cy.center();
-           // After layout/fit, position level nodes inside their parent and lock them
-           this.positionLevelNodes();
-         } catch (err) {
-           console.warn('cy resize/fit failed at layoutstop', err);
-         }
-       });
-     });
- 
-     // expose cy on window for quick debugging from the console
-     (window as any).cy = this.cy;
+        {
+          selector: 'edge',
+          style: {
+            'curve-style': 'bezier',
+            'width': 2,
+            'line-color': '#999',
+            'target-arrow-shape': 'triangle',
+            'target-arrow-color': '#999'
+          }
+        },
+        {
+          selector: 'node[category = "Backend"]',
+          style: { 'background-color': '#4A90E2' }
+        },
+        {
+          selector: 'node[category = "Frontend"]',
+          style: { 'background-color': '#50C878' }
+        },
+        {
+          selector: 'node[category = "Infra"]',
+          style: { 'background-color': '#F5A623' }
+        },
+        // searched/highlight/faded styles
+        {
+          selector: 'node.searched',
+          style: {
+            'border-width': 3,
+            'border-color': '#FFD54F',
+            'background-color': '#fff',
+            'width': 'mapData(level, 1, 5, 90, 180)'
+          }
+        },
+        {
+          // only apply highlight sizing to main nodes (exclude level nodes)
+          selector: 'node.selected',
+          style: {
+            'border-width': 4,
+            'border-color': '#FF5A5F',
+            'background-color': '#ffffff',
+            'width': 'mapData(level, 1, 5, 100, 200)'
+          }
+        },
+        {
+          selector: 'node.faded',
+          style: {
+            'opacity': 0.1,
+            'text-opacity': 0.2
+          }
+        },
+        {
+          selector: 'edge.faded',
+          style: {
+            'opacity': 0.05
+          }
+        },
+      ],
+      // Use centralized options
+      layout: (this.getLayoutOptions(this.layoutName) as any)
+    });
+
+    // Ensure we perform a resize/fit after layout stops, which is more reliable
+    this.cy.on('layoutstop', () => {
+      console.log('layoutstop:', {
+        nodes: this.cy.nodes().length,
+        containerWidth: container.clientWidth,
+        containerHeight: container.clientHeight,
+        bbox: this.cy.elements().boundingBox()
+      });
+      // schedule a resize and fit in the next animation frame
+      requestAnimationFrame(() => {
+        try {
+          this.cy.resize();
+          this.fit();
+          this.cy.center();
+          // After layout/fit, position level nodes inside their parent and lock them
+          this.positionLevelNodes();
+        } catch (err) {
+          console.warn('cy resize/fit failed at layoutstop', err);
+        }
+      });
+    });
+
+    // expose cy on window for quick debugging from the console
+    (window as any).cy = this.cy;
 
     // make attached level nodes follow their parent when the parent moves (drag or programmatic position change)
     const repositionAttached = (node: any) => {
@@ -256,7 +283,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         }
       });
     };
- 
+
     // reposition while dragging for immediate feedback
     this.cy.on('drag', 'node:not(.level-node)', (evt: any) => {
       repositionAttached(evt.target);
@@ -265,7 +292,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.cy.on('position', 'node:not(.level-node)', (evt: any) => {
       repositionAttached(evt.target);
     });
- 
+
     // Node click => populate details (only for main nodes)
     this.cy.on('tap', 'node:not(.level-node)', (evt: any) => {
       const node = evt.target;
@@ -298,7 +325,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         });
       }
     });
- 
+
     // Click background to clear selection
     this.cy.on('tap', (evt: any) => {
       // If the tap target is the core (background)
@@ -306,7 +333,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.clearSelection();
       }
     });
- 
+
     window.addEventListener('resize', () => {
       if (this.cy) {
         this.cy.resize();
@@ -315,7 +342,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.positionLevelNodes();
       }
     });
- 
+
     // ensure initial rendering is correct by calling resize/fit after the initial creation
     requestAnimationFrame(() => {
       if (this.cy) {
@@ -370,20 +397,20 @@ export class AppComponent implements OnInit, AfterViewInit {
   }
 
   addElementsToCytoscape(elements: any[]) {
-     if (!this.cy) {
-       console.warn('Cytoscape not initialized yet, skipping addElements');
-       return;
-     }
- 
-     // Defensive: if no elements, create a debug node so we can verify Cytoscape renders
-     if (!elements || elements.length === 0) {
+    if (!this.cy) {
+      console.warn('Cytoscape not initialized yet, skipping addElements');
+      return;
+    }
+
+    // Defensive: if no elements, create a debug node so we can verify Cytoscape renders
+    if (!elements || elements.length === 0) {
       elements = [
         { data: { id: 'skill-1', label: 'Demo Node', category: 'Backend', level: 2 } },
         { data: { id: 'skill-1-level', label: 'Lv.2', level: 2, attachedTo: 'skill-1' }, classes: 'level-node' }
       ];
       console.warn('No elements provided; adding a demo node for debugging.');
     }
- 
+
     console.log('adding elements to cy:', elements.length, 'container size', (document.getElementById('cy')?.clientWidth), (document.getElementById('cy')?.clientHeight));
     this.cy.startBatch();
     try {
@@ -399,10 +426,12 @@ export class AppComponent implements OnInit, AfterViewInit {
           // ignore
         }
       });
- 
-       // run layout only on non-level elements so level nodes are not rearranged by layout
-       const layout = this.cy.elements(':not(.level-node)').layout((this.getLayoutOptions(this.layoutName) as any));
-       layout.run();
+
+      // run layout only on non-level elements so level nodes are not rearranged by layout
+      const layout = this.cy.elements(':not(.level-node)').layout((this.getLayoutOptions(this.layoutName) as any));
+      layout.run();
+
+      this.applyFilters();
 
       // fallback: ensure resize/fit after a small delay in case layoutstop isn't triggered or complete
       setTimeout(() => {
@@ -414,16 +443,16 @@ export class AppComponent implements OnInit, AfterViewInit {
               this.cy.center();
               // fallback positioning too
               this.positionLevelNodes();
-             } catch (e) {
-               // ignore
-             }
-           }
-         });
-       }, 100);
-     } finally {
-       this.cy.endBatch();
-     }
-   }
+            } catch (e) {
+              // ignore
+            }
+          }
+        });
+      }, 100);
+    } finally {
+      this.cy.endBatch();
+    }
+  }
 
   // Toolbar actions
   fit() {
@@ -455,33 +484,68 @@ export class AppComponent implements OnInit, AfterViewInit {
 
 
   applySearch(term: string) {
-     if (!this.cy) return;
-     this.searchTerm = term.trim();
-     this.cy.nodes().removeClass('searched faded');
- 
-     if (this.searchTerm === '') {
-       // Reset state
-       return;
-     }
- 
-     const lower = this.searchTerm.toLowerCase();
-    // search only main nodes by label, then show their level children too
-    const matches = this.cy.nodes(':not(.level-node)').filter((n: any) => (n.data('label') || '').toLowerCase().includes(lower));
- 
-    // fade all, then unfade matches
-    this.cy.nodes().addClass('faded');
-    matches.removeClass('faded').addClass('searched');
-    // make sure level nodes attached to matches are visible
-    matches.forEach((n: any) => {
+    this.searchTerm = (term ?? '').trim();
+    this.applyFilters();
+  }
+
+  onLevelFilterChange(value: string) {
+    this.levelFilter = value === 'all' ? 'all' : String(value);
+    this.applyFilters();
+  }
+
+  onCategoryFilterChange(value: string) {
+    this.categoryFilter = value;
+    this.applyFilters();
+  }
+
+  applyFilters() {
+    if (!this.cy) return;
+
+    const mainNodes = this.cy.nodes(':not(.level-node)');
+    const edges = this.cy.edges();
+
+    mainNodes.removeClass('searched faded');
+    edges.removeClass('faded');
+
+    const hasActiveSearch = this.searchTerm !== '';
+    const hasLevelFilter = this.levelFilter !== 'all';
+    const hasCategoryFilter = this.categoryFilter !== 'all';
+
+    const lower = this.searchTerm.toLowerCase();
+
+    const filtered = mainNodes.filter((n: any) => {
+      const label = ((n.data('label') ?? '') as string).toLowerCase();
+      const level = n.data('level');
+      const category = n.data('category');
+
+      if (hasActiveSearch && !label.includes(lower)) return false;
+      if (hasLevelFilter && level !== Number(this.levelFilter)) return false;
+      if (hasCategoryFilter && category !== this.categoryFilter) return false;
+
+      return true;
+    });
+
+    if (!hasActiveSearch && !hasLevelFilter && !hasCategoryFilter) {
+      return;
+    }
+
+    mainNodes.addClass('faded');
+    edges.addClass('faded');
+
+    filtered.removeClass('faded');
+
+    if (hasActiveSearch) {
+      filtered.addClass('searched');
+    }
+
+    filtered.forEach((n: any) => {
       const id = n.id();
       this.cy.nodes(`.level-node[attachedTo = "${id}"]`).removeClass('faded');
     });
- 
-     // Fade edges not connected to any match
-     this.cy.edges().addClass('faded');
-     const connectedEdges = matches.connectedEdges();
-     connectedEdges.removeClass('faded');
-   }
+
+    filtered.connectedEdges().removeClass('faded');
+  }
+
 
   clearSelection() {
     if (!this.cy) return;
@@ -583,7 +647,7 @@ export class AppComponent implements OnInit, AfterViewInit {
             this.fit();
             this.positionLevelNodes();
           }
-        } catch {}
+        } catch { }
       });
 
       // update UI inside Angular zone so it reflects immediately
