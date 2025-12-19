@@ -19,8 +19,10 @@ export class AppComponent implements OnInit, AfterViewInit {
   cy: any = null;
   selectedNode: any = null;
   searchTerm = '';
-  levelFilter = 'all';
-  categoryFilter = 'all';
+  levelMenuOpen = false;
+  categoryMenuOpen = false;
+  selectedLevels: Set<number> = new Set();
+  selectedCategories: Set<string> = new Set();
   levelOptions: number[] = [];
   categoryOptions: string[] = [];
   sidebarCollapsed = false;
@@ -98,6 +100,8 @@ export class AppComponent implements OnInit, AfterViewInit {
 
       this.categoryOptions = Array.from(categorySet).sort();
       this.levelOptions = Array.from(levelSet).sort((a, b) => a - b);
+      this.selectedCategories = new Set(this.categoryOptions);
+      this.selectedLevels = new Set(this.levelOptions);
 
       // If cytoscape is already initialized (e.g., data arrives after view init), add elements
       if (this.cy) {
@@ -457,6 +461,24 @@ export class AppComponent implements OnInit, AfterViewInit {
   // Toolbar actions
   fit() {
     if (!this.cy) return;
+
+    const totalCategories = this.categoryOptions.length;
+    const hasCategoryFilter = totalCategories > 0 && this.selectedCategories.size > 0 && this.selectedCategories.size < totalCategories;
+
+    if (hasCategoryFilter) {
+      const categoryNodes = this.cy.nodes(':not(.level-node)').filter((n: any) => this.selectedCategories.has(n.data('category')));
+      if (categoryNodes.length > 0) {
+        const attachedLevelNodes = this.cy.collection();
+        categoryNodes.forEach((n: any) => {
+          attachedLevelNodes.merge(this.cy.nodes(`.level-node[attachedTo = "${n.id()}"]`));
+        });
+
+        const targets = categoryNodes.union(attachedLevelNodes);
+        this.cy.fit(targets, 20);
+        return;
+      }
+    }
+
     this.cy.fit(null, 20);
   }
 
@@ -488,13 +510,41 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.applyFilters();
   }
 
-  onLevelFilterChange(value: string) {
-    this.levelFilter = value === 'all' ? 'all' : String(value);
+  toggleLevelMenu() {
+    this.levelMenuOpen = !this.levelMenuOpen;
+  }
+
+  toggleCategoryMenu() {
+    this.categoryMenuOpen = !this.categoryMenuOpen;
+  }
+
+  get levelSelectionLabel() {
+    if (this.levelOptions.length === 0) return '0';
+    if (this.selectedLevels.size === this.levelOptions.length) return 'すべて';
+    return String(this.selectedLevels.size);
+  }
+
+  get categorySelectionLabel() {
+    if (this.categoryOptions.length === 0) return '0';
+    if (this.selectedCategories.size === this.categoryOptions.length) return 'すべて';
+    return String(this.selectedCategories.size);
+  }
+
+  toggleLevelSelection(level: number, checked: boolean) {
+    if (checked) {
+      this.selectedLevels.add(level);
+    } else {
+      this.selectedLevels.delete(level);
+    }
     this.applyFilters();
   }
 
-  onCategoryFilterChange(value: string) {
-    this.categoryFilter = value;
+  toggleCategorySelection(category: string, checked: boolean) {
+    if (checked) {
+      this.selectedCategories.add(category);
+    } else {
+      this.selectedCategories.delete(category);
+    }
     this.applyFilters();
   }
 
@@ -508,8 +558,8 @@ export class AppComponent implements OnInit, AfterViewInit {
     edges.removeClass('faded');
 
     const hasActiveSearch = this.searchTerm !== '';
-    const hasLevelFilter = this.levelFilter !== 'all';
-    const hasCategoryFilter = this.categoryFilter !== 'all';
+    const hasLevelFilter = this.selectedLevels.size > 0 && this.selectedLevels.size < this.levelOptions.length;
+    const hasCategoryFilter = this.selectedCategories.size > 0 && this.selectedCategories.size < this.categoryOptions.length;
 
     const lower = this.searchTerm.toLowerCase();
 
@@ -519,8 +569,8 @@ export class AppComponent implements OnInit, AfterViewInit {
       const category = n.data('category');
 
       if (hasActiveSearch && !label.includes(lower)) return false;
-      if (hasLevelFilter && level !== Number(this.levelFilter)) return false;
-      if (hasCategoryFilter && category !== this.categoryFilter) return false;
+      if (hasLevelFilter && !this.selectedLevels.has(level)) return false;
+      if (hasCategoryFilter && !this.selectedCategories.has(category)) return false;
 
       return true;
     });
@@ -544,6 +594,36 @@ export class AppComponent implements OnInit, AfterViewInit {
     });
 
     filtered.connectedEdges().removeClass('faded');
+  }
+
+  refreshLevelOptionsFromGraph() {
+    if (!this.cy) return;
+
+    const levelSet = new Set<number>();
+    this.cy.nodes(':not(.level-node)').forEach((n: any) => {
+      const level = Number(n.data('level'));
+      if (Number.isFinite(level)) levelSet.add(level);
+    });
+
+    const newOptions = Array.from(levelSet).sort((a, b) => a - b);
+    const prevAllSelected = this.levelOptions.length > 0 && this.selectedLevels.size === this.levelOptions.length;
+    const previousSelection = new Set(this.selectedLevels);
+
+    this.levelOptions = newOptions;
+
+    const nextSelection = new Set<number>();
+    if (prevAllSelected || previousSelection.size === 0) {
+      newOptions.forEach((l) => nextSelection.add(l));
+    } else {
+      newOptions.forEach((l) => {
+        if (previousSelection.has(l)) {
+          nextSelection.add(l);
+        }
+      });
+    }
+
+    this.selectedLevels = nextSelection;
+    this.applyFilters();
   }
 
 
@@ -638,6 +718,8 @@ export class AppComponent implements OnInit, AfterViewInit {
         levelNode.data('level', this.selectedLevel);
       }
 
+      this.refreshLevelOptionsFromGraph();
+
       // schedule a small layout-update/resize so visual changes are visible
       requestAnimationFrame(() => {
         try {
@@ -672,4 +754,3 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
   }
 }
-

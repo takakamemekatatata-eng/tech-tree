@@ -7,7 +7,6 @@
         <button class="btn" (click)="zoomIn()">＋</button>
         <button class="btn" (click)="zoomOut()">－</button>
         <button class="btn" (click)="switchLayout()">Layout</button>
-        <button class="btn" (click)="clearSelection()">Clear</button>
         <button class="btn" (click)="toggleSidebar()" title="Toggle details">≡</button>
       </div>
     </div>
@@ -17,25 +16,37 @@
         <input type="text" placeholder="検索..." aria-label="search" (input)="applySearch($any($event.target).value)" />
 
         <div class="filters">
-          <label class="filter">
-            <span>レベル</span>
-            <select [value]="levelFilter" (change)="onLevelFilterChange($any($event.target).value)">
-              <option value="all">All Levels</option>
-              <option *ngFor="let l of levelOptions" [value]="l">
-                Lv.{{ l }}
-              </option>
-            </select>
-          </label>
+          <div class="filter dropdown" [class.open]="levelMenuOpen">
+            <button class="btn filter-trigger" type="button" (click)="toggleLevelMenu()">
+              レベル ({{ levelSelectionLabel }})
+            </button>
+            <div class="filter-menu" *ngIf="levelMenuOpen">
+              <label *ngFor="let l of levelOptions" class="checkbox-row">
+                <input
+                  type="checkbox"
+                  [checked]="selectedLevels.has(l)"
+                  (change)="toggleLevelSelection(l, $any($event.target).checked)"
+                />
+                <span>Lv.{{ l }}</span>
+              </label>
+            </div>
+          </div>
 
-          <label class="filter">
-            <span>カテゴリ</span>
-            <select [value]="categoryFilter" (change)="onCategoryFilterChange($any($event.target).value)">
-              <option value="all">All Categories</option>
-              <option *ngFor="let c of categoryOptions" [value]="c">
-                {{ c }}
-              </option>
-            </select>
-          </label>
+          <div class="filter dropdown" [class.open]="categoryMenuOpen">
+            <button class="btn filter-trigger" type="button" (click)="toggleCategoryMenu()">
+              カテゴリ ({{ categorySelectionLabel }})
+            </button>
+            <div class="filter-menu" *ngIf="categoryMenuOpen">
+              <label *ngFor="let c of categoryOptions" class="checkbox-row">
+                <input
+                  type="checkbox"
+                  [checked]="selectedCategories.has(c)"
+                  (change)="toggleCategorySelection(c, $any($event.target).checked)"
+                />
+                <span>{{ c }}</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </div>
