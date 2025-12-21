@@ -1,5 +1,6 @@
 import { Component, OnInit, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import axios from 'axios';
@@ -11,7 +12,7 @@ cytoscape.use(dagre);
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './app.html',
   styleUrls: ['./app.css']
 })
@@ -51,7 +52,7 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   async ngOnInit() {
     try {
-      const response = await axios.get('http://localhost:8000/skills/');
+      const response = await axios.get(`${environment.apiUrl}/skills/`);
       const skills = response.data;
       console.log('skills fetched', skills?.length);
 
@@ -69,7 +70,9 @@ export class AppComponent implements OnInit, AfterViewInit {
           label: s.name,
           category: s.category,
           level: s.level,
-          parent_id: s.parent_id
+          parent_id: s.parent_id,
+          description: s.description,
+          user_comment: s.user_comment
         }
       }));
 
@@ -306,7 +309,10 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.clearNodeSelection();
         node.addClass('selected');
         this.selectedNode = { ...data };
-        this.selectedLevel = Number(data.level ?? 1);
+        this.selectedLevel = Number(data.level ?? 0);
+        this.selectedComment = data.user_comment ?? '';
+        this.editedComment = this.selectedComment;
+        this.isEditingComment = false;
         this.sidebarCollapsed = false;
         this.cdr.detectChanges();
       });
@@ -323,7 +329,10 @@ export class AppComponent implements OnInit, AfterViewInit {
           this.clearNodeSelection();
           parent.addClass('selected');
           this.selectedNode = { ...parent.data() };
-          this.selectedLevel = Number(parent.data('level') ?? 1);
+          this.selectedLevel = Number(parent.data('level') ?? 0);
+          this.selectedComment = parent.data('user_comment') ?? '';
+          this.editedComment = this.selectedComment;
+          this.isEditingComment = false;
           this.sidebarCollapsed = false;
           this.cdr.detectChanges();
         });
@@ -632,6 +641,9 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.clearNodeSelection();
     this.selectedNode = null;
     this.selectedLevel = null;
+    this.selectedComment = '';
+    this.editedComment = '';
+    this.isEditingComment = false;
     this.saveMessage = '';
     this.saveError = false;
     // ensure UI immediately reflects cleared state
@@ -649,30 +661,50 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   // for level editing
   selectedLevel: number | null = null;
-  isSavingLevel = false;
+  selectedComment = '';
+  editedComment = '';
+  isEditingComment = false;
+  isSavingDetails = false;
   saveMessage = '';
   saveError = false;
 
   // Called when user edits the number field
   onLevelInput(value: string | number) {
     const v = Number(value);
-    if (Number.isFinite(v) && v >= 1) {
+    if (Number.isFinite(v) && v >= 0) {
       this.selectedLevel = Math.floor(v);
     }
   }
 
   incrementLevel() {
-    if (this.selectedLevel == null) this.selectedLevel = 1;
+    if (this.selectedLevel == null) this.selectedLevel = 0;
     this.selectedLevel = this.selectedLevel + 1;
   }
 
   decrementLevel() {
-    if (this.selectedLevel == null) this.selectedLevel = 1;
-    this.selectedLevel = Math.max(1, this.selectedLevel - 1);
+    if (this.selectedLevel == null) this.selectedLevel = 0;
+    this.selectedLevel = Math.max(0, this.selectedLevel - 1);
   }
 
-  // Save updated level to backend and update cytoscape elements
-  async saveLevel() {
+  startCommentEdit() {
+    this.editedComment = this.selectedComment;
+    this.isEditingComment = true;
+  }
+
+  cancelCommentEdit() {
+    this.editedComment = this.selectedComment;
+    this.isEditingComment = false;
+  }
+
+  hasUnsavedChanges() {
+    if (!this.selectedNode) return false;
+    const levelChanged = this.selectedLevel !== this.selectedNode.level;
+    const commentChanged = this.editedComment !== this.selectedComment;
+    return levelChanged || commentChanged;
+  }
+
+  // Save updated level/comment to backend and update cytoscape elements
+  async saveDetails() {
     if (!this.selectedNode || this.selectedLevel == null) return;
     this.saveError = false;
     // extract numeric id from data id like 'skill-12'
@@ -693,22 +725,29 @@ export class AppComponent implements OnInit, AfterViewInit {
     try {
       // ensure UI shows "Saving..." immediately
       this.ngZone.run(() => {
-        this.isSavingLevel = true;
+        this.isSavingDetails = true;
         this.saveMessage = 'Saving...';
         this.saveError = false;
         this.cdr.detectChanges();
       });
 
       // PATCH backend (assumes endpoint exists at /skills/<id>/)
-      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, { level: this.selectedLevel });
+      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, {
+        level: this.selectedLevel,
+        user_comment: this.editedComment
+      });
 
       // update selectedNode state
       this.selectedNode.level = this.selectedLevel;
+      this.selectedNode.user_comment = this.editedComment;
+      this.selectedComment = this.editedComment;
+      this.isEditingComment = false;
 
       // update main cytoscape node's data to reflect new level (affects mapData sizing)
       const mainNode = this.cy.getElementById(`skill-${skillId}`);
       if (mainNode && mainNode.length > 0) {
         mainNode.data('level', this.selectedLevel);
+        mainNode.data('user_comment', this.selectedComment);
       }
 
       // update the corresponding level-node label
@@ -734,23 +773,23 @@ export class AppComponent implements OnInit, AfterViewInit {
 
       // update UI inside Angular zone so it reflects immediately
       this.ngZone.run(() => {
-        this.isSavingLevel = false;
+        this.isSavingDetails = false;
         this.saveMessage = 'Saved';
         this.saveError = false;
         this.cdr.detectChanges();
       });
       setTimeout(() => this.ngZone.run(() => (this.saveMessage = '')), 2000);
     } catch (err) {
-      console.error('Failed to save level', err);
+      console.error('Failed to save details', err);
       this.ngZone.run(() => {
-        this.isSavingLevel = false;
+        this.isSavingDetails = false;
         this.saveMessage = 'Save failed';
         this.saveError = true;
         this.cdr.detectChanges();
       });
       setTimeout(() => this.ngZone.run(() => (this.saveMessage = '')), 3000);
     } finally {
-      this.isSavingLevel = false;
+      this.isSavingDetails = false;
     }
   }
 }

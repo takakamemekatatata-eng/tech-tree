@@ -6,6 +6,8 @@ class Skill(models.Model):
     name = models.CharField(max_length=100)
     level = models.IntegerField()
     category = models.CharField(max_length=100, null=True, blank=True)
+    description = models.TextField(default='')
+    user_comment = models.TextField(default='')
     parent = models.ForeignKey(
         'self',
         null=True,

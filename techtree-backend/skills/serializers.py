@@ -6,9 +6,9 @@ class SkillSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Skill
-        fields = ['id', 'name', 'category', 'level', 'parent_id']
+        fields = ['id', 'name', 'category', 'level', 'description', 'user_comment', 'parent_id']
 
     def validate_level(self, value):
-        if value is None or value < 1:
-            raise serializers.ValidationError('level must be an integer >= 1')
+        if value is None or value < 0:
+            raise serializers.ValidationError('level must be an integer >= 0')
         return value

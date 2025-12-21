@@ -188,6 +188,46 @@ app-root {
   text-align: center;
 }
 
+.detail-row {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-text {
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  line-height: 1.5;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.comment-display {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 60px;
+  white-space: pre-wrap;
+}
+
+.details textarea {
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  padding: 8px;
+  font-size: 14px;
+  resize: vertical;
+}
+
 .btn.small {
   padding: 4px 6px;
   font-size: 12px;

@@ -8,9 +8,11 @@ SET search_path = techtree, public;
 CREATE TABLE IF NOT EXISTS skills (
   id BIGSERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
-  level INTEGER NOT NULL DEFAULT 1,
+  level INTEGER NOT NULL DEFAULT 0,
   category VARCHAR(100),
-  parent_id BIGINT REFERENCES skills(id) ON DELETE SET NULL
+  parent_id BIGINT REFERENCES skills(id) ON DELETE SET NULL,
+  description TEXT NOT NULL DEFAULT 'スキルの説明は準備中です。',
+  user_comment TEXT NOT NULL DEFAULT ''
 );
 
 -- helpful indexes

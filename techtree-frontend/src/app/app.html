@@ -61,21 +61,35 @@
 
     <div class="details-body">
       <ng-container *ngIf="selectedNode; else emptyDetails">
-        <div class="detail-row"><strong>ID:</strong> {{ selectedNode?.id }}</div>
         <div class="detail-row"><strong>Label:</strong> {{ selectedNode?.label }}</div>
         <div class="detail-row"><strong>Category:</strong> {{ selectedNode?.category }}</div>
+
+        <div class="detail-row description-row">
+          <strong>Description:</strong>
+          <div class="detail-text">{{ selectedNode?.description || '説明が登録されていません。' }}</div>
+        </div>
 
         <!-- replaced static Level display with editable UI -->
         <div class="detail-row">
           <strong>Level:</strong>
           <div class="level-controls">
             <button class="btn small" (click)="decrementLevel()" title="Decrease">－</button>
-            <input type="number" [value]="selectedLevel" (input)="onLevelInput($event.target.value)" min="1" />
+            <input type="number" [value]="selectedLevel" (input)="onLevelInput($event.target.value)" min="0" />
             <button class="btn small" (click)="incrementLevel()" title="Increase">＋</button>
-            <button class="btn" (click)="saveLevel()"
-              [disabled]="isSavingLevel || selectedLevel === selectedNode?.level">Save</button>
+            <button class="btn" (click)="saveDetails()"
+              [disabled]="isSavingDetails || !hasUnsavedChanges()">Save</button>
           </div>
           <div class="save-message" *ngIf="saveMessage" [class.error]="saveError">{{ saveMessage }}</div>
+        </div>
+
+        <div class="detail-row comment-row">
+          <div class="comment-header">
+            <strong>Comment:</strong>
+            <button class="btn small" *ngIf="!isEditingComment" (click)="startCommentEdit()">Edit</button>
+            <button class="btn small" *ngIf="isEditingComment" (click)="cancelCommentEdit()">Cancel</button>
+          </div>
+          <div *ngIf="!isEditingComment" class="comment-display">{{ selectedComment || 'コメントがありません。' }}</div>
+          <textarea *ngIf="isEditingComment" [(ngModel)]="editedComment" rows="4" placeholder="コメントを入力してください"></textarea>
         </div>
       </ng-container>
 

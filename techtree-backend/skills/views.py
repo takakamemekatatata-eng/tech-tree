@@ -24,29 +24,45 @@ class SkillViewSet(
 
     def partial_update(self, request, *args, **kwargs):
         """
-        Only allow updating `level`
+        Only allow updating `level` and `user_comment`
         """
         instance = self.get_object()
         data = request.data or {}
 
-        if 'level' not in data:
+        allowed_keys = {'level', 'user_comment'}
+        unexpected_keys = set(data.keys()) - allowed_keys
+        if unexpected_keys:
             return Response(
-                {'detail': 'Only `level` can be updated.'},
+                {'detail': f'Only {sorted(allowed_keys)} can be updated.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            level = int(data['level'])
-            if level < 1:
-                raise ValueError()
-        except Exception:
+        updated_fields = []
+
+        if 'level' in data:
+            try:
+                level = int(data['level'])
+                if level < 0:
+                    raise ValueError()
+                instance.level = level
+                updated_fields.append('level')
+            except Exception:
+                return Response(
+                    {'level': ['Must be integer >= 0']},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        if 'user_comment' in data:
+            instance.user_comment = data.get('user_comment') or ''
+            updated_fields.append('user_comment')
+
+        if not updated_fields:
             return Response(
-                {'level': ['Must be integer >= 1']},
+                {'detail': 'No updatable fields provided.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        instance.level = level
-        instance.save(update_fields=['level'])
+        instance.save(update_fields=updated_fields)
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data, status=status.HTTP_200_OK)
