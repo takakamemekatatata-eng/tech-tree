@@ -8,6 +8,11 @@
         <button class="btn" (click)="zoomOut()">－</button>
         <button class="btn" (click)="switchLayout()">Layout</button>
         <button class="btn" (click)="toggleSidebar()" title="Toggle details">≡</button>
+        <button class="btn" (click)="toggleViewMode()">
+          {{ viewMode === 'graph' ? '表表示に切替' : 'ツリー表示に切替' }}
+        </button>
+        <button class="btn" *ngIf="viewMode === 'table'" (click)="downloadCsv()">CSV</button>
+        <button class="btn" *ngIf="viewMode === 'graph'" (click)="downloadPng()">PNG</button>
       </div>
     </div>
 
@@ -99,6 +104,44 @@
 
   <main class="main-area">
     <!-- cytoscape container -->
-    <div id="cy"></div>
+    <div id="cy" [class.hidden]="viewMode === 'table'"></div>
+
+    <div class="table-view" *ngIf="viewMode === 'table'">
+      <div class="table-inner">
+        <table class="skill-table">
+          <thead>
+            <tr>
+              <th (click)="toggleSort('label')">Name <span class="sort-indicator">{{ sortIndicator('label') }}</span></th>
+              <th (click)="toggleSort('category')">Category <span class="sort-indicator">{{ sortIndicator('category') }}</span></th>
+              <th (click)="toggleSort('level')">Level <span class="sort-indicator">{{ sortIndicator('level') }}</span></th>
+              <th (click)="toggleSort('description')">
+                Description <span class="sort-indicator">{{ sortIndicator('description') }}</span>
+              </th>
+              <th (click)="toggleSort('user_comment')">Comment <span class="sort-indicator">{{ sortIndicator('user_comment') }}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let row of filteredTableRows"
+              (click)="selectSkillFromTable(row)"
+              [class.active]="selectedNode?.id === 'skill-' + row.id"
+            >
+              <td>{{ row.name || row.label }}</td>
+              <td>{{ row.category }}</td>
+              <td class="editable-cell">
+                <input type="number" min="0" [value]="row.level" (blur)="onTableLevelBlur(row, $any($event.target).value)" />
+              </td>
+              <td class="description-cell">{{ row.description || '' }}</td>
+              <td class="editable-cell">
+                <textarea rows="2" [value]="row.user_comment || ''" (blur)="onTableCommentBlur(row, $any($event.target).value)"></textarea>
+              </td>
+            </tr>
+            <tr *ngIf="!filteredTableRows || filteredTableRows.length === 0">
+              <td colspan="5" class="empty-row">該当するデータがありません</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
 </div>

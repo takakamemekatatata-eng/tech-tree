@@ -173,6 +173,80 @@ app-root {
   background: #fafafa;
 }
 
+#cy.hidden {
+  display: none;
+}
+
+.table-view {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: #fff;
+}
+
+.table-inner {
+  padding: 12px;
+  min-width: 720px;
+}
+
+.skill-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.skill-table th,
+.skill-table td {
+  border: 1px solid #e9ecef;
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.skill-table thead th {
+  background: #f8f9fa;
+  cursor: pointer;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.skill-table tbody tr.active {
+  background: #fff9db;
+}
+
+.editable-cell input,
+.editable-cell textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 6px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.editable-cell textarea {
+  resize: vertical;
+}
+
+.description-cell {
+  max-width: 320px;
+  white-space: pre-wrap;
+}
+
+.empty-row {
+  text-align: center;
+  color: #868e96;
+  padding: 16px 0;
+}
+
+.sort-indicator {
+  font-size: 12px;
+  margin-left: 4px;
+  color: #868e96;
+}
+
 .level-controls {
   display: inline-flex;
   gap: 8px;

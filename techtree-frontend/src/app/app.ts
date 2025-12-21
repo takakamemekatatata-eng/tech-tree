@@ -32,6 +32,18 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   elements: any[] = []; // store node + edge elements until cy is initialized
 
+  // table / view state
+  viewMode: 'graph' | 'table' = 'graph';
+  skills: any[] = [];
+  filteredTableRows: any[] = [];
+  sortState: {
+    column: 'label' | 'category' | 'level' | 'user_comment' | 'description';
+    direction: 'asc' | 'desc';
+  } = {
+    column: 'label',
+    direction: 'asc'
+  };
+
   // --------------------------
   // Centralized layout config
   // --------------------------
@@ -55,6 +67,8 @@ export class AppComponent implements OnInit, AfterViewInit {
       const response = await axios.get(`${environment.apiUrl}/skills/`);
       const skills = response.data;
       console.log('skills fetched', skills?.length);
+
+      this.skills = skills ?? [];
 
       const categorySet = new Set<string>();
       const levelSet = new Set<number>();
@@ -100,6 +114,8 @@ export class AppComponent implements OnInit, AfterViewInit {
       // assemble nodes + level nodes + edges
       this.elements = [...nodeElements, ...levelNodes, ...edgeElements];
       console.log('built elements', this.elements.length);
+
+      this.refreshTableRows();
 
       this.categoryOptions = Array.from(categorySet).sort();
       this.levelOptions = Array.from(levelSet).sort((a, b) => a - b);
@@ -570,6 +586,60 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.applyFilters(true);
   }
 
+  refreshTableRows() {
+    this.filteredTableRows = this.computeFilteredRows();
+  }
+
+  toggleSort(column: 'label' | 'category' | 'level' | 'user_comment' | 'description') {
+    if (this.sortState.column === column) {
+      this.sortState = {
+        column,
+        direction: this.sortState.direction === 'asc' ? 'desc' : 'asc'
+      };
+    } else {
+      this.sortState = { column, direction: 'asc' };
+    }
+
+    this.refreshTableRows();
+  }
+
+  sortIndicator(column: 'label' | 'category' | 'level' | 'user_comment' | 'description') {
+    if (this.sortState.column !== column) return '';
+    return this.sortState.direction === 'asc' ? '▲' : '▼';
+  }
+
+  private computeFilteredRows() {
+    const hasActiveSearch = this.searchTerm !== '';
+    const hasLevelFilter = this.selectedLevels.size > 0 && this.selectedLevels.size < this.levelOptions.length;
+    const hasCategoryFilter = this.selectedCategories.size > 0 && this.selectedCategories.size < this.categoryOptions.length;
+    const isLevelZeroSelected = this.selectedLevels.has(0);
+    const lower = this.searchTerm.toLowerCase();
+
+    const filtered = (this.skills ?? []).filter((skill: any) => {
+      if (!isLevelZeroSelected && Number(skill.level) === 0) return false;
+      if (hasCategoryFilter && !this.selectedCategories.has(skill.category)) return false;
+      if (hasLevelFilter && !this.selectedLevels.has(skill.level)) return false;
+      if (hasActiveSearch && !String(skill.name ?? skill.label ?? '').toLowerCase().includes(lower)) return false;
+      return true;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      const { column, direction } = this.sortState;
+      const dir = direction === 'asc' ? 1 : -1;
+
+      if (column === 'level') {
+        return (Number(a.level) - Number(b.level)) * dir;
+      }
+
+      const av = String(column === 'label' ? (a.name ?? a.label ?? '') : a[column] ?? '').toLowerCase();
+      const bv = String(column === 'label' ? (b.name ?? b.label ?? '') : b[column] ?? '').toLowerCase();
+      if (av === bv) return 0;
+      return av > bv ? dir : -dir;
+    });
+
+    return sorted.map((skill) => ({ ...skill }));
+  }
+
   applyFilters(forceRelayout: boolean = false) {
     if (!this.cy) return;
 
@@ -643,6 +713,7 @@ export class AppComponent implements OnInit, AfterViewInit {
       if (needsRelayout) {
         this.relayoutVisibleElements();
       }
+      this.refreshTableRows();
       return;
     }
 
@@ -665,6 +736,8 @@ export class AppComponent implements OnInit, AfterViewInit {
     if (needsRelayout) {
       this.relayoutVisibleElements();
     }
+
+    this.refreshTableRows();
   }
 
   private relayoutVisibleElements() {
@@ -736,6 +809,86 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.sidebarCollapsed = !this.sidebarCollapsed;
   }
 
+  toggleViewMode(nextMode?: 'graph' | 'table') {
+    this.viewMode = nextMode ?? (this.viewMode === 'graph' ? 'table' : 'graph');
+
+    if (this.viewMode === 'graph' && this.cy) {
+      requestAnimationFrame(() => {
+        try {
+          this.cy.resize();
+          this.fit();
+          this.positionLevelNodes();
+        } catch { }
+      });
+    }
+
+    this.refreshTableRows();
+  }
+
+  downloadCsv() {
+    if (!this.filteredTableRows || this.filteredTableRows.length === 0) return;
+
+    const headers = ['ID', 'Name', 'Category', 'Level', 'Description', 'User Comment'];
+    const lines = this.filteredTableRows.map((row: any) => [
+      row.id,
+      row.name ?? row.label ?? '',
+      row.category ?? '',
+      row.level ?? '',
+      (row.description ?? '').replace(/\r?\n/g, ' '),
+      row.user_comment ?? ''
+    ]);
+
+    const csvContent = [headers, ...lines]
+      .map((line) => line.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'skills.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  downloadPng() {
+    if (!this.cy) return;
+    const data = this.cy.png({ full: true, bg: '#ffffff' });
+    const a = document.createElement('a');
+    a.href = data;
+    a.download = 'techtree.png';
+    a.click();
+  }
+
+  selectSkillFromTable(row: any) {
+    if (!row || row.id == null) return;
+    this.selectSkillById(Number(row.id));
+  }
+
+  private selectSkillById(skillId: number) {
+    const nodeId = `skill-${skillId}`;
+    const node = this.cy?.getElementById(nodeId);
+    const nodeData = node && node.length > 0 ? node.data() : this.skills.find((s: any) => Number(s.id) === Number(skillId));
+
+    if (!nodeData) return;
+
+    this.ngZone.run(() => {
+      this.clearNodeSelection();
+      if (node && node.length > 0) {
+        node.addClass('selected');
+      }
+
+      this.selectedNode = { ...nodeData, id: nodeId };
+      this.selectedLevel = Number(nodeData.level ?? 0);
+      this.selectedComment = nodeData.user_comment ?? '';
+      this.editedComment = this.selectedComment;
+      this.saveMessage = '';
+      this.saveError = false;
+      this.sidebarCollapsed = false;
+      this.cdr.detectChanges();
+    });
+  }
+
   // for level editing
   selectedLevel: number | null = null;
   selectedComment = '';
@@ -772,6 +925,89 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   onCommentBlur() {
     this.persistDetails({ user_comment: this.editedComment ?? '' });
+  }
+
+  onTableLevelBlur(row: any, value: string | number) {
+    const v = Number(value);
+    if (!Number.isFinite(v) || v < 0) return;
+    const nextLevel = Math.floor(v);
+    if (nextLevel === row.level) return;
+    this.saveSkill(Number(row.id), { level: nextLevel }, row.level).catch((err) =>
+      console.error('Failed to save level from table', err)
+    );
+  }
+
+  onTableCommentBlur(row: any, value: string) {
+    const nextComment = value ?? '';
+    if ((row.user_comment ?? '') === nextComment) return;
+    this.saveSkill(Number(row.id), { user_comment: nextComment }).catch((err) =>
+      console.error('Failed to save comment from table', err)
+    );
+  }
+
+  private applySkillChanges(skillId: number, payload: { level?: number; user_comment?: string }) {
+    const skill = this.skills.find((s: any) => Number(s.id) === Number(skillId));
+    if (skill) {
+      if (payload.level != null) skill.level = payload.level;
+      if (payload.user_comment != null) skill.user_comment = payload.user_comment;
+    }
+
+    const nodeId = `skill-${skillId}`;
+    if (payload.level != null && this.cy) {
+      const mainNode = this.cy.getElementById(nodeId);
+      if (mainNode && mainNode.length > 0) {
+        mainNode.data('level', payload.level);
+      }
+
+      const levelNode = this.cy.getElementById(`${nodeId}-level`);
+      if (levelNode && levelNode.length > 0) {
+        levelNode.data('label', `Lv.${payload.level}`);
+        levelNode.data('level', payload.level);
+      }
+    }
+
+    if (payload.user_comment != null && this.cy) {
+      const mainNode = this.cy.getElementById(nodeId);
+      if (mainNode && mainNode.length > 0) {
+        mainNode.data('user_comment', payload.user_comment);
+      }
+    }
+
+    if (this.selectedNode && this.selectedNode.id === nodeId) {
+      this.selectedNode = { ...this.selectedNode, ...payload };
+      if (payload.level != null) this.selectedLevel = payload.level;
+      if (payload.user_comment != null) {
+        this.selectedComment = payload.user_comment;
+        this.editedComment = payload.user_comment;
+      }
+    }
+
+    this.refreshTableRows();
+  }
+
+  private async saveSkill(
+    skillId: number,
+    payload: { level?: number; user_comment?: string },
+    originalLevel?: number
+  ) {
+    if (!payload || Object.keys(payload).length === 0) return;
+    await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, payload);
+
+    this.applySkillChanges(skillId, payload);
+    this.refreshLevelOptionsFromGraph();
+
+    const needsRelayout = payload.level != null && (payload.level === 0 || originalLevel === 0);
+    this.applyFilters(needsRelayout);
+
+    requestAnimationFrame(() => {
+      try {
+        if (this.cy) {
+          this.cy.resize();
+          this.fit();
+          this.positionLevelNodes();
+        }
+      } catch { }
+    });
   }
 
   private async persistDetails(change: { level?: number; user_comment?: string }) {
@@ -811,43 +1047,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.cdr.detectChanges();
       });
 
-      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, payload);
-
-      if (payload.level != null) {
-        this.selectedNode.level = payload.level;
-        this.selectedLevel = payload.level;
-
-        const mainNode = this.cy.getElementById(`skill-${skillId}`);
-        if (mainNode && mainNode.length > 0) {
-          mainNode.data('level', payload.level);
-        }
-
-        const levelNode = this.cy.getElementById(`skill-${skillId}-level`);
-        if (levelNode && levelNode.length > 0) {
-          levelNode.data('label', `Lv.${payload.level}`);
-          levelNode.data('level', payload.level);
-        }
-      }
-
-      if (payload.user_comment != null) {
-        this.selectedNode.user_comment = payload.user_comment;
-        this.selectedComment = payload.user_comment;
-      }
-
-      this.refreshLevelOptionsFromGraph();
-
-      const needsRelayout = payload.level != null && (payload.level === 0 || originalLevel === 0);
-      this.applyFilters(needsRelayout);
-
-      requestAnimationFrame(() => {
-        try {
-          if (this.cy) {
-            this.cy.resize();
-            this.fit();
-            this.positionLevelNodes();
-          }
-        } catch { }
-      });
+      await this.saveSkill(Number(skillId), payload, originalLevel);
 
       this.ngZone.run(() => {
         this.isSavingDetails = false;
