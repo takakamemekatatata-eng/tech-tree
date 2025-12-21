@@ -104,7 +104,8 @@ export class AppComponent implements OnInit, AfterViewInit {
       this.categoryOptions = Array.from(categorySet).sort();
       this.levelOptions = Array.from(levelSet).sort((a, b) => a - b);
       this.selectedCategories = new Set(this.categoryOptions);
-      this.selectedLevels = new Set(this.levelOptions);
+      const defaultLevels = this.levelOptions.filter((lvl) => lvl > 0);
+      this.selectedLevels = new Set(defaultLevels.length > 0 ? defaultLevels : this.levelOptions);
 
       // If cytoscape is already initialized (e.g., data arrives after view init), add elements
       if (this.cy) {
@@ -312,7 +313,8 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.selectedLevel = Number(data.level ?? 0);
         this.selectedComment = data.user_comment ?? '';
         this.editedComment = this.selectedComment;
-        this.isEditingComment = false;
+        this.saveMessage = '';
+        this.saveError = false;
         this.sidebarCollapsed = false;
         this.cdr.detectChanges();
       });
@@ -332,7 +334,8 @@ export class AppComponent implements OnInit, AfterViewInit {
           this.selectedLevel = Number(parent.data('level') ?? 0);
           this.selectedComment = parent.data('user_comment') ?? '';
           this.editedComment = this.selectedComment;
-          this.isEditingComment = false;
+          this.saveMessage = '';
+          this.saveError = false;
           this.sidebarCollapsed = false;
           this.cdr.detectChanges();
         });
@@ -471,11 +474,12 @@ export class AppComponent implements OnInit, AfterViewInit {
   fit() {
     if (!this.cy) return;
 
+    const visibleMainNodes = this.cy.nodes(':not(.level-node):visible');
     const totalCategories = this.categoryOptions.length;
     const hasCategoryFilter = totalCategories > 0 && this.selectedCategories.size > 0 && this.selectedCategories.size < totalCategories;
 
     if (hasCategoryFilter) {
-      const categoryNodes = this.cy.nodes(':not(.level-node)').filter((n: any) => this.selectedCategories.has(n.data('category')));
+      const categoryNodes = visibleMainNodes.filter((n: any) => this.selectedCategories.has(n.data('category')));
       if (categoryNodes.length > 0) {
         const attachedLevelNodes = this.cy.collection();
         categoryNodes.forEach((n: any) => {
@@ -486,6 +490,13 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.cy.fit(targets, 20);
         return;
       }
+    }
+
+    if (visibleMainNodes.length > 0) {
+      const attachedLevelNodes = this.cy.collection();
+      visibleMainNodes.forEach((n: any) => attachedLevelNodes.merge(this.cy.nodes(`.level-node[attachedTo = "${n.id()}"]`)));
+      this.cy.fit(visibleMainNodes.union(attachedLevelNodes), 20);
+      return;
     }
 
     this.cy.fit(null, 20);
@@ -540,12 +551,14 @@ export class AppComponent implements OnInit, AfterViewInit {
   }
 
   toggleLevelSelection(level: number, checked: boolean) {
+    const wasLevelZeroSelected = this.selectedLevels.has(0);
     if (checked) {
       this.selectedLevels.add(level);
     } else {
       this.selectedLevels.delete(level);
     }
-    this.applyFilters();
+    const levelZeroChanged = level === 0 && wasLevelZeroSelected !== this.selectedLevels.has(0);
+    this.applyFilters(levelZeroChanged);
   }
 
   toggleCategorySelection(category: string, checked: boolean) {
@@ -554,25 +567,67 @@ export class AppComponent implements OnInit, AfterViewInit {
     } else {
       this.selectedCategories.delete(category);
     }
-    this.applyFilters();
+    this.applyFilters(true);
   }
 
-  applyFilters() {
+  applyFilters(forceRelayout: boolean = false) {
     if (!this.cy) return;
 
     const mainNodes = this.cy.nodes(':not(.level-node)');
+    const levelNodes = this.cy.nodes('.level-node');
     const edges = this.cy.edges();
 
     mainNodes.removeClass('searched faded');
     edges.removeClass('faded');
 
+    let needsRelayout = forceRelayout;
+
+    const ensureDisplay = (ele: any, value: 'none' | 'element') => {
+      if (ele.style('display') !== value) {
+        ele.style('display', value);
+        needsRelayout = true;
+      }
+    };
+
+    mainNodes.forEach((n: any) => ensureDisplay(n, 'element'));
+    levelNodes.forEach((n: any) => ensureDisplay(n, 'element'));
+    edges.forEach((e: any) => ensureDisplay(e, 'element'));
+
     const hasActiveSearch = this.searchTerm !== '';
     const hasLevelFilter = this.selectedLevels.size > 0 && this.selectedLevels.size < this.levelOptions.length;
     const hasCategoryFilter = this.selectedCategories.size > 0 && this.selectedCategories.size < this.categoryOptions.length;
+    const isLevelZeroSelected = this.selectedLevels.has(0);
 
     const lower = this.searchTerm.toLowerCase();
 
-    const filtered = mainNodes.filter((n: any) => {
+    const hideNodeAndConnections = (node: any) => {
+      ensureDisplay(node, 'none');
+      const id = node.id();
+      this.cy.nodes(`.level-node[attachedTo = "${id}"]`).forEach((lvl: any) => ensureDisplay(lvl, 'none'));
+      this.cy.edges(`[source = "${id}"], [target = "${id}"]`).forEach((edge: any) => ensureDisplay(edge, 'none'));
+    };
+
+    if (hasCategoryFilter) {
+      mainNodes.forEach((n: any) => {
+        const category = n.data('category');
+        if (!this.selectedCategories.has(category)) {
+          hideNodeAndConnections(n);
+        }
+      });
+    }
+
+    if (!isLevelZeroSelected) {
+      mainNodes.forEach((n: any) => {
+        const level = Number(n.data('level'));
+        if (level === 0) {
+          hideNodeAndConnections(n);
+        }
+      });
+    }
+
+    const visibleMainNodes = mainNodes.filter(':visible');
+
+    const filtered = visibleMainNodes.filter((n: any) => {
       const label = ((n.data('label') ?? '') as string).toLowerCase();
       const level = n.data('level');
       const category = n.data('category');
@@ -585,10 +640,13 @@ export class AppComponent implements OnInit, AfterViewInit {
     });
 
     if (!hasActiveSearch && !hasLevelFilter && !hasCategoryFilter) {
+      if (needsRelayout) {
+        this.relayoutVisibleElements();
+      }
       return;
     }
 
-    mainNodes.addClass('faded');
+    visibleMainNodes.addClass('faded');
     edges.addClass('faded');
 
     filtered.removeClass('faded');
@@ -603,6 +661,26 @@ export class AppComponent implements OnInit, AfterViewInit {
     });
 
     filtered.connectedEdges().removeClass('faded');
+
+    if (needsRelayout) {
+      this.relayoutVisibleElements();
+    }
+  }
+
+  private relayoutVisibleElements() {
+    if (!this.cy) return;
+    const visibleMainNodes = this.cy.nodes(':not(.level-node):visible');
+    if (visibleMainNodes.length === 0) return;
+
+    const layout = visibleMainNodes.layout((this.getLayoutOptions(this.layoutName) as any));
+    layout.run();
+
+    requestAnimationFrame(() => {
+      try {
+        this.positionLevelNodes();
+        this.fit();
+      } catch { }
+    });
   }
 
   refreshLevelOptionsFromGraph() {
@@ -643,7 +721,6 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.selectedLevel = null;
     this.selectedComment = '';
     this.editedComment = '';
-    this.isEditingComment = false;
     this.saveMessage = '';
     this.saveError = false;
     // ensure UI immediately reflects cleared state
@@ -663,7 +740,6 @@ export class AppComponent implements OnInit, AfterViewInit {
   selectedLevel: number | null = null;
   selectedComment = '';
   editedComment = '';
-  isEditingComment = false;
   isSavingDetails = false;
   saveMessage = '';
   saveError = false;
@@ -672,46 +748,37 @@ export class AppComponent implements OnInit, AfterViewInit {
   onLevelInput(value: string | number) {
     const v = Number(value);
     if (Number.isFinite(v) && v >= 0) {
-      this.selectedLevel = Math.floor(v);
+      const nextLevel = Math.floor(v);
+      if (this.selectedLevel !== nextLevel) {
+        this.selectedLevel = nextLevel;
+        this.persistDetails({ level: nextLevel });
+      }
     }
   }
 
   incrementLevel() {
     if (this.selectedLevel == null) this.selectedLevel = 0;
-    this.selectedLevel = this.selectedLevel + 1;
+    const nextLevel = this.selectedLevel + 1;
+    this.selectedLevel = nextLevel;
+    this.persistDetails({ level: nextLevel });
   }
 
   decrementLevel() {
     if (this.selectedLevel == null) this.selectedLevel = 0;
-    this.selectedLevel = Math.max(0, this.selectedLevel - 1);
+    const nextLevel = Math.max(0, this.selectedLevel - 1);
+    this.selectedLevel = nextLevel;
+    this.persistDetails({ level: nextLevel });
   }
 
-  startCommentEdit() {
-    this.editedComment = this.selectedComment;
-    this.isEditingComment = true;
+  onCommentBlur() {
+    this.persistDetails({ user_comment: this.editedComment ?? '' });
   }
 
-  cancelCommentEdit() {
-    this.editedComment = this.selectedComment;
-    this.isEditingComment = false;
-  }
-
-  hasUnsavedChanges() {
-    if (!this.selectedNode) return false;
-    const levelChanged = this.selectedLevel !== this.selectedNode.level;
-    const commentChanged = this.editedComment !== this.selectedComment;
-    return levelChanged || commentChanged;
-  }
-
-  // Save updated level/comment to backend and update cytoscape elements
-  async saveDetails() {
-    if (!this.selectedNode || this.selectedLevel == null) return;
-    this.saveError = false;
-    // extract numeric id from data id like 'skill-12'
+  private async persistDetails(change: { level?: number; user_comment?: string }) {
+    if (!this.selectedNode) return;
     const dataId: string = this.selectedNode.id ?? this.selectedNode['id'];
     const match = String(dataId).match(/^skill-(\d+)$/);
     if (!match) {
-      // run inside zone so UI updates immediately
       this.ngZone.run(() => {
         this.saveMessage = 'Invalid node id';
         this.saveError = true;
@@ -722,59 +789,69 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
     const skillId = match[1];
 
+    const payload: any = {};
+    const originalLevel = this.selectedNode.level;
+
+    if (change.level != null && change.level !== this.selectedNode.level) {
+      payload.level = change.level;
+    }
+    if (change.user_comment != null && change.user_comment !== this.selectedNode.user_comment) {
+      payload.user_comment = change.user_comment;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return;
+    }
+
     try {
-      // ensure UI shows "Saving..." immediately
       this.ngZone.run(() => {
         this.isSavingDetails = true;
-        this.saveMessage = 'Saving...';
+        this.saveMessage = '🟡 Saving...';
         this.saveError = false;
         this.cdr.detectChanges();
       });
 
-      // PATCH backend (assumes endpoint exists at /skills/<id>/)
-      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, {
-        level: this.selectedLevel,
-        user_comment: this.editedComment
-      });
+      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, payload);
 
-      // update selectedNode state
-      this.selectedNode.level = this.selectedLevel;
-      this.selectedNode.user_comment = this.editedComment;
-      this.selectedComment = this.editedComment;
-      this.isEditingComment = false;
+      if (payload.level != null) {
+        this.selectedNode.level = payload.level;
+        this.selectedLevel = payload.level;
 
-      // update main cytoscape node's data to reflect new level (affects mapData sizing)
-      const mainNode = this.cy.getElementById(`skill-${skillId}`);
-      if (mainNode && mainNode.length > 0) {
-        mainNode.data('level', this.selectedLevel);
-        mainNode.data('user_comment', this.selectedComment);
+        const mainNode = this.cy.getElementById(`skill-${skillId}`);
+        if (mainNode && mainNode.length > 0) {
+          mainNode.data('level', payload.level);
+        }
+
+        const levelNode = this.cy.getElementById(`skill-${skillId}-level`);
+        if (levelNode && levelNode.length > 0) {
+          levelNode.data('label', `Lv.${payload.level}`);
+          levelNode.data('level', payload.level);
+        }
       }
 
-      // update the corresponding level-node label
-      const levelNode = this.cy.getElementById(`skill-${skillId}-level`);
-      if (levelNode && levelNode.length > 0) {
-        levelNode.data('label', `Lv.${this.selectedLevel}`);
-        levelNode.data('level', this.selectedLevel);
+      if (payload.user_comment != null) {
+        this.selectedNode.user_comment = payload.user_comment;
+        this.selectedComment = payload.user_comment;
       }
 
       this.refreshLevelOptionsFromGraph();
 
-      // schedule a small layout-update/resize so visual changes are visible
+      const needsRelayout = payload.level != null && (payload.level === 0 || originalLevel === 0);
+      this.applyFilters(needsRelayout);
+
       requestAnimationFrame(() => {
         try {
           if (this.cy) {
             this.cy.resize();
-            // no full layout to avoid repositioning; fit to keep viewport consistent
             this.fit();
             this.positionLevelNodes();
           }
         } catch { }
       });
 
-      // update UI inside Angular zone so it reflects immediately
       this.ngZone.run(() => {
         this.isSavingDetails = false;
-        this.saveMessage = 'Saved';
+        this.saveMessage = '🟢 Saved';
         this.saveError = false;
         this.cdr.detectChanges();
       });
@@ -783,13 +860,10 @@ export class AppComponent implements OnInit, AfterViewInit {
       console.error('Failed to save details', err);
       this.ngZone.run(() => {
         this.isSavingDetails = false;
-        this.saveMessage = 'Save failed';
+        this.saveMessage = 'バックエンドで問題が発生しました';
         this.saveError = true;
         this.cdr.detectChanges();
       });
-      setTimeout(() => this.ngZone.run(() => (this.saveMessage = '')), 3000);
-    } finally {
-      this.isSavingDetails = false;
     }
   }
 }

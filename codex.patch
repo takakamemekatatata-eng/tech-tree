@@ -1,0 +1,776 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/techtree-frontend/src/app/app.css b/techtree-frontend/src/app/app.css
+index ad2268197485efb02a08fb239d4cea25943b3086..5daa1cb5a647dc9d2524f958e158fd8a8604d1dd 100644
+--- a/techtree-frontend/src/app/app.css
++++ b/techtree-frontend/src/app/app.css
+@@ -173,71 +173,54 @@ app-root {
+   background: #fafafa;
+ }
+ 
+ .level-controls {
+   display: inline-flex;
+   gap: 8px;
+   align-items: center;
+   margin-left: 8px;
+ }
+ 
+ .level-controls input[type="number"] {
+   width: 64px;
+   padding: 6px;
+   border-radius: 6px;
+   border: 1px solid #ddd;
+   text-align: center;
+ }
+ 
+ .detail-row {
+   margin-bottom: 12px;
+   display: flex;
+   flex-direction: column;
+   gap: 6px;
+ }
+ 
+-.detail-text {
+-  background: #f8f9fa;
+-  padding: 8px;
+-  border-radius: 6px;
+-  border: 1px solid #e9ecef;
+-  line-height: 1.5;
+-}
+-
+-.comment-header {
+-  display: flex;
+-  align-items: center;
+-  gap: 8px;
+-  justify-content: space-between;
+-}
+-
+-.comment-display {
+-  background: #f8f9fa;
+-  border: 1px solid #e9ecef;
+-  border-radius: 6px;
+-  padding: 8px;
+-  min-height: 60px;
++.description-text {
++  margin: 0;
++  line-height: 1.6;
++  color: #333;
+   white-space: pre-wrap;
+ }
+ 
+ .details textarea {
+   width: 100%;
+   border-radius: 6px;
+   border: 1px solid #ced4da;
+   padding: 8px;
+   font-size: 14px;
+   resize: vertical;
+ }
+ 
+ .btn.small {
+   padding: 4px 6px;
+   font-size: 12px;
+ }
+ 
+ .save-message {
+   margin-top: 6px;
+   color: #2f9e44; /* green for success; changes to red on failure via content */
+   font-size: 13px;
+ }
+ 
+ /* error variant for save messages */
+ .save-message.error {
+diff --git a/techtree-frontend/src/app/app.html b/techtree-frontend/src/app/app.html
+index 37779273cc60c3d66406d1abfa5b5aca5557a826..8e21fd84bbc9dd065e0edc00b6f0a13e297f22e0 100644
+--- a/techtree-frontend/src/app/app.html
++++ b/techtree-frontend/src/app/app.html
+@@ -44,63 +44,61 @@
+                   (change)="toggleCategorySelection(c, $any($event.target).checked)"
+                 />
+                 <span>{{ c }}</span>
+               </label>
+             </div>
+           </div>
+         </div>
+       </div>
+     </div>
+   </div>
+ </header>
+ 
+ <div class="app-body">
+   <aside class="details" [class.collapsed]="sidebarCollapsed" id="details">
+     <div class="details-header">
+       <strong>Details</strong>
+     </div>
+ 
+     <div class="details-body">
+       <ng-container *ngIf="selectedNode; else emptyDetails">
+         <div class="detail-row"><strong>Label:</strong> {{ selectedNode?.label }}</div>
+         <div class="detail-row"><strong>Category:</strong> {{ selectedNode?.category }}</div>
+ 
+         <div class="detail-row description-row">
+           <strong>Description:</strong>
+-          <div class="detail-text">{{ selectedNode?.description || '説明が登録されていません。' }}</div>
++          <p class="description-text">{{ selectedNode?.description || '説明が登録されていません。' }}</p>
+         </div>
+ 
+         <!-- replaced static Level display with editable UI -->
+         <div class="detail-row">
+           <strong>Level:</strong>
+           <div class="level-controls">
+             <button class="btn small" (click)="decrementLevel()" title="Decrease">－</button>
+             <input type="number" [value]="selectedLevel" (input)="onLevelInput($event.target.value)" min="0" />
+             <button class="btn small" (click)="incrementLevel()" title="Increase">＋</button>
+-            <button class="btn" (click)="saveDetails()"
+-              [disabled]="isSavingDetails || !hasUnsavedChanges()">Save</button>
+           </div>
+           <div class="save-message" *ngIf="saveMessage" [class.error]="saveError">{{ saveMessage }}</div>
+         </div>
+ 
+         <div class="detail-row comment-row">
+-          <div class="comment-header">
+-            <strong>Comment:</strong>
+-            <button class="btn small" *ngIf="!isEditingComment" (click)="startCommentEdit()">Edit</button>
+-            <button class="btn small" *ngIf="isEditingComment" (click)="cancelCommentEdit()">Cancel</button>
+-          </div>
+-          <div *ngIf="!isEditingComment" class="comment-display">{{ selectedComment || 'コメントがありません。' }}</div>
+-          <textarea *ngIf="isEditingComment" [(ngModel)]="editedComment" rows="4" placeholder="コメントを入力してください"></textarea>
++          <strong>Comment:</strong>
++          <textarea
++            [(ngModel)]="editedComment"
++            rows="4"
++            placeholder="コメントを入力してください"
++            (blur)="onCommentBlur()"
++          ></textarea>
+         </div>
+       </ng-container>
+ 
+       <ng-template #emptyDetails>
+         <div class="empty">Select a node to view details</div>
+       </ng-template>
+     </div>
+   </aside>
+ 
+   <main class="main-area">
+     <!-- cytoscape container -->
+     <div id="cy"></div>
+   </main>
+ </div>
+\ No newline at end of file
+diff --git a/techtree-frontend/src/app/app.ts b/techtree-frontend/src/app/app.ts
+index 4dea700b77e8c4e72778b03ecbe546a1708eb689..7350204e155bac3b7ae6f8ba785572de22f529f2 100644
+--- a/techtree-frontend/src/app/app.ts
++++ b/techtree-frontend/src/app/app.ts
+@@ -82,51 +82,52 @@ export class AppComponent implements OnInit, AfterViewInit {
+           id: `skill-${s.id}-level`,
+           label: `Lv.${s.level}`,
+           level: s.level,
+           attachedTo: `skill-${s.id}`
+         },
+         classes: 'level-node'
+       }));
+ 
+       const edgeElements = skills
+         .filter((s: any) => s.parent_id !== null && s.parent_id !== undefined && s.parent_id !== s.id)
+         .map((s: any) => ({
+           data: {
+             id: `edge-${s.parent_id}-${s.id}`,
+             source: `skill-${s.parent_id}`,
+             target: `skill-${s.id}`
+           }
+         }));
+ 
+       // assemble nodes + level nodes + edges
+       this.elements = [...nodeElements, ...levelNodes, ...edgeElements];
+       console.log('built elements', this.elements.length);
+ 
+       this.categoryOptions = Array.from(categorySet).sort();
+       this.levelOptions = Array.from(levelSet).sort((a, b) => a - b);
+       this.selectedCategories = new Set(this.categoryOptions);
+-      this.selectedLevels = new Set(this.levelOptions);
++      const defaultLevels = this.levelOptions.filter((lvl) => lvl > 0);
++      this.selectedLevels = new Set(defaultLevels.length > 0 ? defaultLevels : this.levelOptions);
+ 
+       // If cytoscape is already initialized (e.g., data arrives after view init), add elements
+       if (this.cy) {
+         this.addElementsToCytoscape(this.elements);
+       }
+     } catch (error) {
+       console.error('Failed to fetch skills', error);
+       this.elements = [];
+     }
+   }
+ 
+   ngAfterViewInit() {
+     // Initialize cytoscape after the view is available
+     this.initCytoscape();
+ 
+     // If data already fetched (even if empty array), add elements so demo fallback renders when empty
+     if (this.elements) {
+       this.addElementsToCytoscape(this.elements);
+     }
+   }
+ 
+   initCytoscape() {
+     const container = document.getElementById('cy');
+     if (!container) {
+       console.error('cy container not found');
+@@ -290,71 +291,73 @@ export class AppComponent implements OnInit, AfterViewInit {
+         }
+       });
+     };
+ 
+     // reposition while dragging for immediate feedback
+     this.cy.on('drag', 'node:not(.level-node)', (evt: any) => {
+       repositionAttached(evt.target);
+     });
+     // reposition when position changes programmatically (e.g., layouts)
+     this.cy.on('position', 'node:not(.level-node)', (evt: any) => {
+       repositionAttached(evt.target);
+     });
+ 
+     // Node click => populate details (only for main nodes)
+     this.cy.on('tap', 'node:not(.level-node)', (evt: any) => {
+       const node = evt.target;
+       const data = node.data();
+       // Cytoscape events run outside Angular zone: ensure UI updates happen inside Angular zone
+       this.ngZone.run(() => {
+         this.clearNodeSelection();
+         node.addClass('selected');
+         this.selectedNode = { ...data };
+         this.selectedLevel = Number(data.level ?? 0);
+         this.selectedComment = data.user_comment ?? '';
+         this.editedComment = this.selectedComment;
+-        this.isEditingComment = false;
++        this.saveMessage = '';
++        this.saveError = false;
+         this.sidebarCollapsed = false;
+         this.cdr.detectChanges();
+       });
+     });
+ 
+     // When a level node is tapped, behave as if its parent was tapped
+     this.cy.on('tap', 'node.level-node', (evt: any) => {
+       const lvl = evt.target;
+       const parentId = lvl.data('attachedTo');
+       if (!parentId) return;
+       const parent = this.cy.getElementById(parentId);
+       if (parent && parent.length > 0) {
+         this.ngZone.run(() => {
+           this.clearNodeSelection();
+           parent.addClass('selected');
+           this.selectedNode = { ...parent.data() };
+           this.selectedLevel = Number(parent.data('level') ?? 0);
+           this.selectedComment = parent.data('user_comment') ?? '';
+           this.editedComment = this.selectedComment;
+-          this.isEditingComment = false;
++          this.saveMessage = '';
++          this.saveError = false;
+           this.sidebarCollapsed = false;
+           this.cdr.detectChanges();
+         });
+       }
+     });
+ 
+     // Click background to clear selection
+     this.cy.on('tap', (evt: any) => {
+       // If the tap target is the core (background)
+       if (evt.target === this.cy || evt.target === evt.cy) {
+         this.clearSelection();
+       }
+     });
+ 
+     window.addEventListener('resize', () => {
+       if (this.cy) {
+         this.cy.resize();
+         this.fit();
+         // re-position level nodes when size changes
+         this.positionLevelNodes();
+       }
+     });
+ 
+     // ensure initial rendering is correct by calling resize/fit after the initial creation
+     requestAnimationFrame(() => {
+@@ -449,67 +452,75 @@ export class AppComponent implements OnInit, AfterViewInit {
+       // fallback: ensure resize/fit after a small delay in case layoutstop isn't triggered or complete
+       setTimeout(() => {
+         requestAnimationFrame(() => {
+           if (this.cy) {
+             try {
+               this.cy.resize();
+               this.fit();
+               this.cy.center();
+               // fallback positioning too
+               this.positionLevelNodes();
+             } catch (e) {
+               // ignore
+             }
+           }
+         });
+       }, 100);
+     } finally {
+       this.cy.endBatch();
+     }
+   }
+ 
+   // Toolbar actions
+   fit() {
+     if (!this.cy) return;
+ 
++    const visibleMainNodes = this.cy.nodes(':not(.level-node):visible');
+     const totalCategories = this.categoryOptions.length;
+     const hasCategoryFilter = totalCategories > 0 && this.selectedCategories.size > 0 && this.selectedCategories.size < totalCategories;
+ 
+     if (hasCategoryFilter) {
+-      const categoryNodes = this.cy.nodes(':not(.level-node)').filter((n: any) => this.selectedCategories.has(n.data('category')));
++      const categoryNodes = visibleMainNodes.filter((n: any) => this.selectedCategories.has(n.data('category')));
+       if (categoryNodes.length > 0) {
+         const attachedLevelNodes = this.cy.collection();
+         categoryNodes.forEach((n: any) => {
+           attachedLevelNodes.merge(this.cy.nodes(`.level-node[attachedTo = "${n.id()}"]`));
+         });
+ 
+         const targets = categoryNodes.union(attachedLevelNodes);
+         this.cy.fit(targets, 20);
+         return;
+       }
+     }
+ 
++    if (visibleMainNodes.length > 0) {
++      const attachedLevelNodes = this.cy.collection();
++      visibleMainNodes.forEach((n: any) => attachedLevelNodes.merge(this.cy.nodes(`.level-node[attachedTo = "${n.id()}"]`)));
++      this.cy.fit(visibleMainNodes.union(attachedLevelNodes), 20);
++      return;
++    }
++
+     this.cy.fit(null, 20);
+   }
+ 
+   zoomIn() {
+     if (!this.cy) return;
+     this.cy.zoom({ level: Math.min(this.cy.zoom() * 1.2, 4) });
+   }
+ 
+   zoomOut() {
+     if (!this.cy) return;
+     this.cy.zoom({ level: Math.max(this.cy.zoom() / 1.2, 0.2) });
+   }
+ 
+   switchLayout() {
+     if (!this.cy) return;
+ 
+     this.layoutName = this.layoutName === 'dagre' ? 'grid' : 'dagre';
+ 
+     // Use centralized configuration for constructing the layout options
+     const newLayoutOpts = this.getLayoutOptions(this.layoutName);
+     this.cy.layout(newLayoutOpts as any).run();
+ 
+     this.fit();
+   }
+ 
+@@ -518,278 +529,341 @@ export class AppComponent implements OnInit, AfterViewInit {
+     this.searchTerm = (term ?? '').trim();
+     this.applyFilters();
+   }
+ 
+   toggleLevelMenu() {
+     this.levelMenuOpen = !this.levelMenuOpen;
+   }
+ 
+   toggleCategoryMenu() {
+     this.categoryMenuOpen = !this.categoryMenuOpen;
+   }
+ 
+   get levelSelectionLabel() {
+     if (this.levelOptions.length === 0) return '0';
+     if (this.selectedLevels.size === this.levelOptions.length) return 'すべて';
+     return String(this.selectedLevels.size);
+   }
+ 
+   get categorySelectionLabel() {
+     if (this.categoryOptions.length === 0) return '0';
+     if (this.selectedCategories.size === this.categoryOptions.length) return 'すべて';
+     return String(this.selectedCategories.size);
+   }
+ 
+   toggleLevelSelection(level: number, checked: boolean) {
++    const wasLevelZeroSelected = this.selectedLevels.has(0);
+     if (checked) {
+       this.selectedLevels.add(level);
+     } else {
+       this.selectedLevels.delete(level);
+     }
+-    this.applyFilters();
++    const levelZeroChanged = level === 0 && wasLevelZeroSelected !== this.selectedLevels.has(0);
++    this.applyFilters(levelZeroChanged);
+   }
+ 
+   toggleCategorySelection(category: string, checked: boolean) {
+     if (checked) {
+       this.selectedCategories.add(category);
+     } else {
+       this.selectedCategories.delete(category);
+     }
+-    this.applyFilters();
++    this.applyFilters(true);
+   }
+ 
+-  applyFilters() {
++  applyFilters(forceRelayout: boolean = false) {
+     if (!this.cy) return;
+ 
+     const mainNodes = this.cy.nodes(':not(.level-node)');
++    const levelNodes = this.cy.nodes('.level-node');
+     const edges = this.cy.edges();
+ 
+     mainNodes.removeClass('searched faded');
+     edges.removeClass('faded');
+ 
++    let needsRelayout = forceRelayout;
++
++    const ensureDisplay = (ele: any, value: 'none' | 'element') => {
++      if (ele.style('display') !== value) {
++        ele.style('display', value);
++        needsRelayout = true;
++      }
++    };
++
++    mainNodes.forEach((n: any) => ensureDisplay(n, 'element'));
++    levelNodes.forEach((n: any) => ensureDisplay(n, 'element'));
++    edges.forEach((e: any) => ensureDisplay(e, 'element'));
++
+     const hasActiveSearch = this.searchTerm !== '';
+     const hasLevelFilter = this.selectedLevels.size > 0 && this.selectedLevels.size < this.levelOptions.length;
+     const hasCategoryFilter = this.selectedCategories.size > 0 && this.selectedCategories.size < this.categoryOptions.length;
++    const isLevelZeroSelected = this.selectedLevels.has(0);
+ 
+     const lower = this.searchTerm.toLowerCase();
+ 
+-    const filtered = mainNodes.filter((n: any) => {
++    const hideNodeAndConnections = (node: any) => {
++      ensureDisplay(node, 'none');
++      const id = node.id();
++      this.cy.nodes(`.level-node[attachedTo = "${id}"]`).forEach((lvl: any) => ensureDisplay(lvl, 'none'));
++      this.cy.edges(`[source = "${id}"], [target = "${id}"]`).forEach((edge: any) => ensureDisplay(edge, 'none'));
++    };
++
++    if (hasCategoryFilter) {
++      mainNodes.forEach((n: any) => {
++        const category = n.data('category');
++        if (!this.selectedCategories.has(category)) {
++          hideNodeAndConnections(n);
++        }
++      });
++    }
++
++    if (!isLevelZeroSelected) {
++      mainNodes.forEach((n: any) => {
++        const level = Number(n.data('level'));
++        if (level === 0) {
++          hideNodeAndConnections(n);
++        }
++      });
++    }
++
++    const visibleMainNodes = mainNodes.filter(':visible');
++
++    const filtered = visibleMainNodes.filter((n: any) => {
+       const label = ((n.data('label') ?? '') as string).toLowerCase();
+       const level = n.data('level');
+       const category = n.data('category');
+ 
+       if (hasActiveSearch && !label.includes(lower)) return false;
+       if (hasLevelFilter && !this.selectedLevels.has(level)) return false;
+       if (hasCategoryFilter && !this.selectedCategories.has(category)) return false;
+ 
+       return true;
+     });
+ 
+     if (!hasActiveSearch && !hasLevelFilter && !hasCategoryFilter) {
++      if (needsRelayout) {
++        this.relayoutVisibleElements();
++      }
+       return;
+     }
+ 
+-    mainNodes.addClass('faded');
++    visibleMainNodes.addClass('faded');
+     edges.addClass('faded');
+ 
+     filtered.removeClass('faded');
+ 
+     if (hasActiveSearch) {
+       filtered.addClass('searched');
+     }
+ 
+     filtered.forEach((n: any) => {
+       const id = n.id();
+       this.cy.nodes(`.level-node[attachedTo = "${id}"]`).removeClass('faded');
+     });
+ 
+     filtered.connectedEdges().removeClass('faded');
++
++    if (needsRelayout) {
++      this.relayoutVisibleElements();
++    }
++  }
++
++  private relayoutVisibleElements() {
++    if (!this.cy) return;
++    const visibleMainNodes = this.cy.nodes(':not(.level-node):visible');
++    if (visibleMainNodes.length === 0) return;
++
++    const layout = visibleMainNodes.layout((this.getLayoutOptions(this.layoutName) as any));
++    layout.run();
++
++    requestAnimationFrame(() => {
++      try {
++        this.positionLevelNodes();
++        this.fit();
++      } catch { }
++    });
+   }
+ 
+   refreshLevelOptionsFromGraph() {
+     if (!this.cy) return;
+ 
+     const levelSet = new Set<number>();
+     this.cy.nodes(':not(.level-node)').forEach((n: any) => {
+       const level = Number(n.data('level'));
+       if (Number.isFinite(level)) levelSet.add(level);
+     });
+ 
+     const newOptions = Array.from(levelSet).sort((a, b) => a - b);
+     const prevAllSelected = this.levelOptions.length > 0 && this.selectedLevels.size === this.levelOptions.length;
+     const previousSelection = new Set(this.selectedLevels);
+ 
+     this.levelOptions = newOptions;
+ 
+     const nextSelection = new Set<number>();
+     if (prevAllSelected || previousSelection.size === 0) {
+       newOptions.forEach((l) => nextSelection.add(l));
+     } else {
+       newOptions.forEach((l) => {
+         if (previousSelection.has(l)) {
+           nextSelection.add(l);
+         }
+       });
+     }
+ 
+     this.selectedLevels = nextSelection;
+     this.applyFilters();
+   }
+ 
+ 
+   clearSelection() {
+     if (!this.cy) return;
+     this.clearNodeSelection();
+     this.selectedNode = null;
+     this.selectedLevel = null;
+     this.selectedComment = '';
+     this.editedComment = '';
+-    this.isEditingComment = false;
+     this.saveMessage = '';
+     this.saveError = false;
+     // ensure UI immediately reflects cleared state
+     this.ngZone.run(() => this.cdr.detectChanges());
+   }
+ 
+   clearNodeSelection() {
+     if (!this.cy) return;
+     this.cy.nodes().removeClass('selected');
+   }
+ 
+   toggleSidebar() {
+     this.sidebarCollapsed = !this.sidebarCollapsed;
+   }
+ 
+   // for level editing
+   selectedLevel: number | null = null;
+   selectedComment = '';
+   editedComment = '';
+-  isEditingComment = false;
+   isSavingDetails = false;
+   saveMessage = '';
+   saveError = false;
+ 
+   // Called when user edits the number field
+   onLevelInput(value: string | number) {
+     const v = Number(value);
+     if (Number.isFinite(v) && v >= 0) {
+-      this.selectedLevel = Math.floor(v);
++      const nextLevel = Math.floor(v);
++      if (this.selectedLevel !== nextLevel) {
++        this.selectedLevel = nextLevel;
++        this.persistDetails({ level: nextLevel });
++      }
+     }
+   }
+ 
+   incrementLevel() {
+     if (this.selectedLevel == null) this.selectedLevel = 0;
+-    this.selectedLevel = this.selectedLevel + 1;
++    const nextLevel = this.selectedLevel + 1;
++    this.selectedLevel = nextLevel;
++    this.persistDetails({ level: nextLevel });
+   }
+ 
+   decrementLevel() {
+     if (this.selectedLevel == null) this.selectedLevel = 0;
+-    this.selectedLevel = Math.max(0, this.selectedLevel - 1);
+-  }
+-
+-  startCommentEdit() {
+-    this.editedComment = this.selectedComment;
+-    this.isEditingComment = true;
++    const nextLevel = Math.max(0, this.selectedLevel - 1);
++    this.selectedLevel = nextLevel;
++    this.persistDetails({ level: nextLevel });
+   }
+ 
+-  cancelCommentEdit() {
+-    this.editedComment = this.selectedComment;
+-    this.isEditingComment = false;
++  onCommentBlur() {
++    this.persistDetails({ user_comment: this.editedComment ?? '' });
+   }
+ 
+-  hasUnsavedChanges() {
+-    if (!this.selectedNode) return false;
+-    const levelChanged = this.selectedLevel !== this.selectedNode.level;
+-    const commentChanged = this.editedComment !== this.selectedComment;
+-    return levelChanged || commentChanged;
+-  }
+-
+-  // Save updated level/comment to backend and update cytoscape elements
+-  async saveDetails() {
+-    if (!this.selectedNode || this.selectedLevel == null) return;
+-    this.saveError = false;
+-    // extract numeric id from data id like 'skill-12'
++  private async persistDetails(change: { level?: number; user_comment?: string }) {
++    if (!this.selectedNode) return;
+     const dataId: string = this.selectedNode.id ?? this.selectedNode['id'];
+     const match = String(dataId).match(/^skill-(\d+)$/);
+     if (!match) {
+-      // run inside zone so UI updates immediately
+       this.ngZone.run(() => {
+         this.saveMessage = 'Invalid node id';
+         this.saveError = true;
+         this.cdr.detectChanges();
+       });
+       setTimeout(() => (this.saveMessage = ''), 2000);
+       return;
+     }
+     const skillId = match[1];
+ 
++    const payload: any = {};
++    const originalLevel = this.selectedNode.level;
++
++    if (change.level != null && change.level !== this.selectedNode.level) {
++      payload.level = change.level;
++    }
++    if (change.user_comment != null && change.user_comment !== this.selectedNode.user_comment) {
++      payload.user_comment = change.user_comment;
++    }
++
++    if (Object.keys(payload).length === 0) {
++      return;
++    }
++
+     try {
+-      // ensure UI shows "Saving..." immediately
+       this.ngZone.run(() => {
+         this.isSavingDetails = true;
+-        this.saveMessage = 'Saving...';
++        this.saveMessage = '🟡 Saving...';
+         this.saveError = false;
+         this.cdr.detectChanges();
+       });
+ 
+-      // PATCH backend (assumes endpoint exists at /skills/<id>/)
+-      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, {
+-        level: this.selectedLevel,
+-        user_comment: this.editedComment
+-      });
++      await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, payload);
++
++      if (payload.level != null) {
++        this.selectedNode.level = payload.level;
++        this.selectedLevel = payload.level;
++
++        const mainNode = this.cy.getElementById(`skill-${skillId}`);
++        if (mainNode && mainNode.length > 0) {
++          mainNode.data('level', payload.level);
++        }
+ 
+-      // update selectedNode state
+-      this.selectedNode.level = this.selectedLevel;
+-      this.selectedNode.user_comment = this.editedComment;
+-      this.selectedComment = this.editedComment;
+-      this.isEditingComment = false;
+-
+-      // update main cytoscape node's data to reflect new level (affects mapData sizing)
+-      const mainNode = this.cy.getElementById(`skill-${skillId}`);
+-      if (mainNode && mainNode.length > 0) {
+-        mainNode.data('level', this.selectedLevel);
+-        mainNode.data('user_comment', this.selectedComment);
++        const levelNode = this.cy.getElementById(`skill-${skillId}-level`);
++        if (levelNode && levelNode.length > 0) {
++          levelNode.data('label', `Lv.${payload.level}`);
++          levelNode.data('level', payload.level);
++        }
+       }
+ 
+-      // update the corresponding level-node label
+-      const levelNode = this.cy.getElementById(`skill-${skillId}-level`);
+-      if (levelNode && levelNode.length > 0) {
+-        levelNode.data('label', `Lv.${this.selectedLevel}`);
+-        levelNode.data('level', this.selectedLevel);
++      if (payload.user_comment != null) {
++        this.selectedNode.user_comment = payload.user_comment;
++        this.selectedComment = payload.user_comment;
+       }
+ 
+       this.refreshLevelOptionsFromGraph();
+ 
+-      // schedule a small layout-update/resize so visual changes are visible
++      const needsRelayout = payload.level != null && (payload.level === 0 || originalLevel === 0);
++      this.applyFilters(needsRelayout);
++
+       requestAnimationFrame(() => {
+         try {
+           if (this.cy) {
+             this.cy.resize();
+-            // no full layout to avoid repositioning; fit to keep viewport consistent
+             this.fit();
+             this.positionLevelNodes();
+           }
+         } catch { }
+       });
+ 
+-      // update UI inside Angular zone so it reflects immediately
+       this.ngZone.run(() => {
+         this.isSavingDetails = false;
+-        this.saveMessage = 'Saved';
++        this.saveMessage = '🟢 Saved';
+         this.saveError = false;
+         this.cdr.detectChanges();
+       });
+       setTimeout(() => this.ngZone.run(() => (this.saveMessage = '')), 2000);
+     } catch (err) {
+       console.error('Failed to save details', err);
+       this.ngZone.run(() => {
+         this.isSavingDetails = false;
+-        this.saveMessage = 'Save failed';
++        this.saveMessage = 'バックエンドで問題が発生しました';
+         this.saveError = true;
+         this.cdr.detectChanges();
+       });
+-      setTimeout(() => this.ngZone.run(() => (this.saveMessage = '')), 3000);
+-    } finally {
+-      this.isSavingDetails = false;
+     }
+   }
+ }
+ 
+EOF
+)
