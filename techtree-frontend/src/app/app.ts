@@ -53,12 +53,19 @@ export class AppComponent implements OnInit, AfterViewInit {
     level: 0,
     description: '',
     parent_id: null as number | null,
-    color: '#4a5568'
+    parentName: ''
   };
+  newSkillError = '';
+  newSkillNotice = '';
   editingCategory = {
     name: '',
     color: '#4a5568'
   };
+  selectedParentName = '';
+  selectedCategoryName = '';
+  metadataSaveMessage = '';
+  metadataSaveIsError = false;
+  skillNameOptions: string[] = [];
 
   // --------------------------
   // Centralized layout config
@@ -94,64 +101,9 @@ export class AppComponent implements OnInit, AfterViewInit {
       console.log('skills fetched', skills?.length);
 
       this.skills = skills ?? [];
-
-      const categorySet = new Set<string>();
-      const levelSet = new Set<number>();
-      skills.forEach((s: any) => {
-        if (s?.category) categorySet.add(s.category);
-        if (Number.isFinite(s?.level)) levelSet.add(Number(s.level));
-      });
-
-      // create main nodes and separate "level nodes" that are children (data.parent set to main node id)
-      const nodeElements = skills.map((s: any) => ({
-        data: {
-          id: 'skill-' + s.id,
-          label: s.name,
-          category: s.category,
-          color: this.categoryColors[s.category] ?? '#d1d5db',
-          level: s.level,
-          parent_id: s.parent_id,
-          description: s.description,
-          user_comment: s.user_comment
-        }
-      }));
-
-      // level nodes are independent nodes (not compound children); use attachedTo to find parent
-      const levelNodes = skills.map((s: any) => ({
-        data: {
-          id: `skill-${s.id}-level`,
-          label: this.levelToStars(s.level),
-          level: s.level,
-          attachedTo: `skill-${s.id}`
-        },
-        classes: 'level-node'
-      }));
-
-      const edgeElements = skills
-        .filter((s: any) => s.parent_id !== null && s.parent_id !== undefined && s.parent_id !== s.id)
-        .map((s: any) => ({
-          data: {
-            id: `edge-${s.parent_id}-${s.id}`,
-            source: `skill-${s.parent_id}`,
-            target: `skill-${s.id}`
-          }
-        }));
-
-      // assemble nodes + level nodes + edges
-      this.elements = [...nodeElements, ...levelNodes, ...edgeElements];
-      console.log('built elements', this.elements.length);
-
-      this.refreshTableRows();
-
-      this.categoryOptions = Array.from(categorySet).sort();
-      this.levelOptions = Array.from(levelSet).sort((a, b) => a - b);
-      this.selectedCategories = new Set(this.categoryOptions);
-      const defaultLevels = this.levelOptions.filter((lvl) => lvl > 0);
-      this.selectedLevels = new Set(defaultLevels.length > 0 ? defaultLevels : this.levelOptions);
-
-      // If cytoscape is already initialized (e.g., data arrives after view init), add elements
-      if (this.cy) {
-        this.addElementsToCytoscape(this.elements);
+      this.rebuildElementsFromSkills();
+      if (!this.editingCategory.name && this.categoryOptions.length > 0) {
+        this.editingCategory.name = this.categoryOptions[0];
       }
     } catch (error) {
       console.error('Failed to fetch skills', error);
@@ -336,18 +288,22 @@ export class AppComponent implements OnInit, AfterViewInit {
       const node = evt.target;
       const data = node.data();
       // Cytoscape events run outside Angular zone: ensure UI updates happen inside Angular zone
-      this.ngZone.run(() => {
-        this.clearNodeSelection();
-        node.addClass('selected');
-        this.selectedNode = { ...data };
-        this.selectedLevel = Number(data.level ?? 0);
-        this.selectedComment = data.user_comment ?? '';
-        this.editedComment = this.selectedComment;
-        this.saveMessage = '';
-        this.saveError = false;
-        this.sidebarCollapsed = false;
-        this.cdr.detectChanges();
-      });
+        this.ngZone.run(() => {
+          this.clearNodeSelection();
+          node.addClass('selected');
+          this.selectedNode = { ...data };
+          this.selectedLevel = Number(data.level ?? 0);
+          this.selectedComment = data.user_comment ?? '';
+          this.editedComment = this.selectedComment;
+          this.selectedCategoryName = data.category ?? '';
+          this.selectedParentName = this.resolveSkillNameById(data.parent_id);
+          this.metadataSaveMessage = '';
+          this.metadataSaveIsError = false;
+          this.saveMessage = '';
+          this.saveError = false;
+          this.sidebarCollapsed = false;
+          this.cdr.detectChanges();
+        });
     });
 
     // When a level node is tapped, behave as if its parent was tapped
@@ -364,6 +320,10 @@ export class AppComponent implements OnInit, AfterViewInit {
           this.selectedLevel = Number(parent.data('level') ?? 0);
           this.selectedComment = parent.data('user_comment') ?? '';
           this.editedComment = this.selectedComment;
+          this.selectedCategoryName = parent.data('category') ?? '';
+          this.selectedParentName = this.resolveSkillNameById(parent.data('parent_id'));
+          this.metadataSaveMessage = '';
+          this.metadataSaveIsError = false;
           this.saveMessage = '';
           this.saveError = false;
           this.sidebarCollapsed = false;
@@ -650,6 +610,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     if (this.viewMode !== 'graph') return;
     this.editingMode = !this.editingMode;
     this.syncEditingModeInteractions();
+    this.refreshViewport();
   }
 
   private clampLevelValue(value: number) {
@@ -657,77 +618,227 @@ export class AppComponent implements OnInit, AfterViewInit {
     return Math.max(0, Math.min(5, Math.floor(value)));
   }
 
-  private pushSkillToState(skill: any) {
-    this.skills.push(skill);
-    const color = this.categoryColors[skill.category] ?? '#d1d5db';
-    const node = {
-      data: {
-        id: `skill-${skill.id}`,
-        label: skill.name,
-        category: skill.category,
-        color,
-        level: skill.level,
-        parent_id: skill.parent_id,
-        description: skill.description,
-        user_comment: skill.user_comment
+  private refreshViewport() {
+    requestAnimationFrame(() => {
+      try {
+        if (!this.cy) return;
+        this.cy.resize();
+        this.fit();
+        this.positionLevelNodes();
+      } catch {
+        // ignore
       }
-    };
-    const lvlNode = {
+    });
+  }
+
+  private refreshSkillNameOptions() {
+    this.skillNameOptions = (this.skills ?? [])
+      .map((s: any) => s?.name ?? s?.label ?? '')
+      .filter((name) => !!name)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  private refreshCategoryOptionsFromState() {
+    const categorySet = new Set<string>();
+    (this.skills ?? []).forEach((s: any) => {
+      if (s?.category) categorySet.add(s.category);
+    });
+
+    const newOptions = Array.from(categorySet).sort();
+    const prevAllSelected =
+      (this.categoryOptions?.length ?? 0) > 0 &&
+      this.selectedCategories.size === (this.categoryOptions?.length ?? 0);
+    const previousSelection = new Set(this.selectedCategories);
+
+    const nextSelection = new Set<string>();
+    if (prevAllSelected) {
+      newOptions.forEach((c) => nextSelection.add(c));
+    } else {
+      newOptions.forEach((c) => {
+        if (previousSelection.has(c)) nextSelection.add(c);
+      });
+    }
+
+    if (nextSelection.size === 0 && newOptions.length > 0) {
+      newOptions.forEach((c) => nextSelection.add(c));
+    }
+
+    this.categoryOptions = newOptions;
+    this.selectedCategories = nextSelection;
+    if (newOptions.length > 0) {
+      if (!this.editingCategory.name || !newOptions.includes(this.editingCategory.name)) {
+        this.editingCategory.name = newOptions[0];
+      }
+      this.editingCategory.color = this.categoryColors[this.editingCategory.name] ?? this.editingCategory.color;
+    } else {
+      this.editingCategory.name = '';
+      this.editingCategory.color = '#4a5568';
+    }
+  }
+
+  private refreshLevelOptionsFromSkills() {
+    const levelSet = new Set<number>();
+    (this.skills ?? []).forEach((s: any) => {
+      const lvl = Number(s?.level);
+      if (Number.isFinite(lvl)) levelSet.add(lvl);
+    });
+
+    const newOptions = Array.from(levelSet).sort((a, b) => a - b);
+    const prevAllSelected =
+      (this.levelOptions?.length ?? 0) > 0 &&
+      this.selectedLevels.size === (this.levelOptions?.length ?? 0);
+    const previousSelection = new Set(this.selectedLevels);
+
+    const nextSelection = new Set<number>();
+    if (prevAllSelected) {
+      newOptions.forEach((l) => nextSelection.add(l));
+    } else {
+      newOptions.forEach((l) => {
+        if (previousSelection.has(l)) nextSelection.add(l);
+      });
+    }
+
+    if (nextSelection.size === 0 && newOptions.length > 0) {
+      const defaultLevels = newOptions.filter((lvl) => lvl > 0);
+      (defaultLevels.length > 0 ? defaultLevels : newOptions).forEach((lvl) => nextSelection.add(lvl));
+    }
+
+    this.levelOptions = newOptions;
+    this.selectedLevels = nextSelection;
+  }
+
+  private async ensureCategoryColor(name: string) {
+    if (!name) return '#d1d5db';
+    if (this.categoryColors[name]) return this.categoryColors[name];
+
+    const color = this.generateRandomColor();
+    this.categoryColors[name] = color;
+    this.categoryOptions = Array.from(new Set([...this.categoryOptions, name])).sort();
+    this.selectedCategories.add(name);
+
+    try {
+      await this.saveCategoryColorInternal(name, color);
+    } catch (err) {
+      console.warn('Failed to persist category color, using local only', err);
+    }
+
+    return color;
+  }
+
+  private generateRandomColor() {
+    const component = () => Math.floor(Math.random() * 156 + 80).toString(16).padStart(2, '0');
+    return `#${component()}${component()}${component()}`;
+  }
+
+  private rebuildElementsFromSkills() {
+    const nodeElements = (this.skills ?? []).map((s: any) => ({
       data: {
-        id: `skill-${skill.id}-level`,
-        label: this.levelToStars(skill.level),
-        level: skill.level,
-        attachedTo: `skill-${skill.id}`
+        id: `skill-${s.id}`,
+        label: s.name,
+        category: s.category,
+        color: this.categoryColors[s.category] ?? '#d1d5db',
+        level: s.level,
+        parent_id: s.parent_id,
+        description: s.description,
+        user_comment: s.user_comment
+      }
+    }));
+
+    const levelNodes = (this.skills ?? []).map((s: any) => ({
+      data: {
+        id: `skill-${s.id}-level`,
+        label: this.levelToStars(s.level),
+        level: s.level,
+        attachedTo: `skill-${s.id}`
       },
       classes: 'level-node'
-    };
-    const edge =
-      skill.parent_id && skill.parent_id !== skill.id
-        ? {
-            data: {
-              id: `edge-${skill.parent_id}-${skill.id}`,
-              source: `skill-${skill.parent_id}`,
-              target: `skill-${skill.id}`
-            }
-          }
-        : null;
+    }));
 
-    this.elements = edge ? [...this.elements, node, lvlNode, edge] : [...this.elements, node, lvlNode];
+    const edgeElements = (this.skills ?? [])
+      .filter((s: any) => s.parent_id !== null && s.parent_id !== undefined && s.parent_id !== s.id)
+      .map((s: any) => ({
+        data: {
+          id: `edge-${s.parent_id}-${s.id}`,
+          source: `skill-${s.parent_id}`,
+          target: `skill-${s.id}`
+        }
+      }));
+
+    this.elements = [...nodeElements, ...levelNodes, ...edgeElements];
+
+    this.refreshCategoryOptionsFromState();
+    this.refreshLevelOptionsFromSkills();
+    this.refreshSkillNameOptions();
+
     if (this.cy) {
       this.addElementsToCytoscape(this.elements);
+      this.refreshViewport();
     }
-    if (!this.categoryOptions.includes(skill.category)) {
-      this.categoryOptions.push(skill.category);
-      this.categoryOptions.sort();
-    }
-    if (!this.levelOptions.includes(skill.level)) {
-      this.levelOptions.push(skill.level);
-      this.levelOptions.sort((a, b) => a - b);
-    }
-    this.selectedCategories.add(skill.category);
-    this.selectedLevels.add(skill.level);
+
     this.refreshTableRows();
+  }
+
+  private resolveSkillNameById(id: number | null | undefined) {
+    if (id === null || id === undefined) return '';
+    const skill = (this.skills ?? []).find((s: any) => Number(s.id) === Number(id));
+    return skill?.name ?? '';
+  }
+
+  private async pushSkillToState(skill: any) {
+    this.skills.push(skill);
+    await this.ensureCategoryColor(skill.category);
+    this.rebuildElementsFromSkills();
   }
 
   async createSkill() {
     if (!this.editingMode || this.viewMode !== 'graph') return;
+    this.newSkillError = '';
+    this.newSkillNotice = '';
+
+    const name = this.newSkill.name.trim();
+    const category = this.newSkill.category.trim();
+    const level = Number(this.newSkill.level);
+    const parentName = this.newSkill.parentName.trim();
+    const errors: string[] = [];
+
+    if (!name) errors.push('名前を入力してください');
+    if (!category) errors.push('カテゴリを入力してください');
+    const parentSkill =
+      parentName && this.skills
+        ? (this.skills ?? []).find(
+            (s: any) => (s?.name ?? s?.label ?? '').toLowerCase() === parentName.toLowerCase()
+          )
+        : null;
+
+    if (parentName && !parentSkill) errors.push('親ノードが存在しません');
+    if (!Number.isFinite(level) || level < 0 || level > 5) errors.push('レベルは0-5の数値で入力してください');
+
+    const nameExists = (this.skills ?? []).some(
+      (s: any) => (s?.name ?? s?.label ?? '').toLowerCase() === name.toLowerCase()
+    );
+    if (nameExists) errors.push('同名のノードが既に存在します');
+
+    if (errors.length > 0) {
+      this.newSkillError = errors.join(' / ');
+      return;
+    }
+
     const payload = {
-      name: this.newSkill.name.trim(),
-      category: this.newSkill.category.trim(),
-      level: this.clampLevelValue(this.newSkill.level),
+      name,
+      category,
+      level: this.clampLevelValue(level),
       description: this.newSkill.description ?? '',
       user_comment: '',
-      parent: this.newSkill.parent_id ? { id: this.newSkill.parent_id } : null
+      parent: parentSkill ? parentSkill.id : null
     };
-    if (!payload.name || !payload.category) return;
+
+    await this.ensureCategoryColor(category);
     const response = await axios.post(`${environment.apiUrl}/skills/`, payload);
     const created = response.data;
-    created.parent_id = created.parent_id ?? this.newSkill.parent_id;
-    this.pushSkillToState(created);
-    if (this.newSkill.color) {
-      await this.saveCategoryColorInternal(payload.category, this.newSkill.color);
-    }
-    this.newSkill = { name: '', category: '', level: 0, description: '', parent_id: null, color: '#4a5568' };
+    created.parent_id = created.parent_id ?? parentSkill?.id ?? null;
+    await this.pushSkillToState(created);
+    this.newSkill = { name: '', category: '', level: 0, description: '', parent_id: null, parentName: '' };
+    this.newSkillNotice = 'ノードを追加しました';
   }
 
   async deleteSelectedSkill() {
@@ -761,6 +872,74 @@ export class AppComponent implements OnInit, AfterViewInit {
     const target = this.skills.find((s: any) => Number(s.id) === id);
     if (target) target.description = this.selectedNode.description;
     this.refreshTableRows();
+  }
+
+  onEditingCategoryChange(name: string) {
+    this.editingCategory = {
+      name,
+      color: this.categoryColors[name] ?? this.editingCategory.color
+    };
+  }
+
+  async saveSelectedMetadata() {
+    if (!this.editingMode || !this.selectedNode) return;
+    const match = String(this.selectedNode.id ?? '').match(/^skill-(\d+)$/);
+    if (!match) return;
+
+    const skillId = Number(match[1]);
+    const category = this.selectedCategoryName.trim();
+    const parentName = this.selectedParentName.trim();
+
+    const errors: string[] = [];
+    if (!category) errors.push('カテゴリを入力してください');
+
+    const parentSkill = parentName
+      ? (this.skills ?? []).find(
+          (s: any) => (s?.name ?? s?.label ?? '').toLowerCase() === parentName.toLowerCase()
+        )
+      : null;
+
+    if (parentName && !parentSkill) errors.push('親ノードが存在しません');
+
+    if (errors.length > 0) {
+      this.metadataSaveMessage = errors.join(' / ');
+      this.metadataSaveIsError = true;
+      return;
+    }
+
+    const payload: any = {};
+    if (category && category !== this.selectedNode.category) payload.category = category;
+
+    const parentId = parentSkill ? parentSkill.id : null;
+    if (parentName || this.selectedNode.parent_id) {
+      payload.parent = parentSkill ? parentId : null;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      this.metadataSaveMessage = '変更がありません';
+      this.metadataSaveIsError = false;
+      return;
+    }
+
+    await this.ensureCategoryColor(category);
+    await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, payload);
+
+    const target = (this.skills ?? []).find((s: any) => Number(s.id) === skillId);
+    if (target) {
+      if (payload.category) target.category = payload.category;
+      if ('parent' in payload) target.parent_id = payload.parent;
+    }
+
+    this.selectedNode = {
+      ...this.selectedNode,
+      category: payload.category ?? this.selectedNode.category,
+      parent_id: 'parent' in payload ? payload.parent : this.selectedNode.parent_id
+    } as any;
+
+    this.rebuildElementsFromSkills();
+    this.metadataSaveMessage = '保存しました';
+    this.metadataSaveIsError = false;
+    this.selectSkillById(skillId);
   }
 
   async saveCategoryColor() {
@@ -1001,6 +1180,10 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.editedComment = '';
     this.saveMessage = '';
     this.saveError = false;
+    this.selectedParentName = '';
+    this.selectedCategoryName = '';
+    this.metadataSaveMessage = '';
+    this.metadataSaveIsError = false;
     // ensure UI immediately reflects cleared state
     this.ngZone.run(() => this.cdr.detectChanges());
   }
@@ -1091,6 +1274,10 @@ export class AppComponent implements OnInit, AfterViewInit {
       this.selectedLevel = Number(nodeData.level ?? 0);
       this.selectedComment = nodeData.user_comment ?? '';
       this.editedComment = this.selectedComment;
+      this.selectedCategoryName = nodeData.category ?? '';
+      this.selectedParentName = this.resolveSkillNameById(nodeData.parent_id);
+      this.metadataSaveMessage = '';
+      this.metadataSaveIsError = false;
       this.saveMessage = '';
       this.saveError = false;
       this.sidebarCollapsed = false;

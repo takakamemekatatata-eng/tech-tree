@@ -124,7 +124,7 @@
         <h3>編集モードの使い方</h3>
         <ol class="edit-steps">
           <li><strong>ノードをクリック</strong>して詳細を開きます。位置はドラッグで調整できます（表示のみ）。</li>
-          <li>新しいノードを作る場合は「ノード追加」で <strong>親ID</strong> を指定して保存します。</li>
+          <li>新しいノードを作る場合は「ノード追加」で必要に応じて <strong>親ノード名</strong> を入力して保存します。</li>
           <li>選択中ノードは説明を上書き保存できます。不要なら「ノードを削除」を押してください。</li>
           <li>カテゴリ名と色を入力して「カテゴリ色を保存」を押すと、グラフ全体に即時反映されます。</li>
         </ol>
@@ -137,24 +137,28 @@
         </div>
         <div class="form-row">
           <label>カテゴリ</label>
-          <input type="text" [(ngModel)]="newSkill.category" placeholder="カテゴリ" />
-        </div>
-        <div class="form-row">
-          <label>カテゴリ色</label>
-          <input type="color" [(ngModel)]="newSkill.color" />
+          <input type="text" [(ngModel)]="newSkill.category" placeholder="カテゴリ" list="category-options-list" />
         </div>
         <div class="form-row">
           <label>レベル(0-5)</label>
           <input type="number" min="0" max="5" [(ngModel)]="newSkill.level" />
         </div>
         <div class="form-row">
-          <label>親ID</label>
-          <input type="number" [(ngModel)]="newSkill.parent_id" placeholder="親ノードID" />
+          <label>親ノード(任意)</label>
+          <input
+            type="text"
+            [(ngModel)]="newSkill.parentName"
+            placeholder="親ノード名"
+            list="skill-name-options-list"
+          />
+          <small class="hint">入力すると候補が表示されます。未入力の場合は親なしで作成します。</small>
         </div>
         <div class="form-row">
           <label>説明</label>
           <textarea rows="2" [(ngModel)]="newSkill.description"></textarea>
         </div>
+        <div class="form-message error" *ngIf="newSkillError">{{ newSkillError }}</div>
+        <div class="form-message success" *ngIf="newSkillNotice">{{ newSkillNotice }}</div>
         <button class="btn primary" (click)="createSkill()">ノードを追加</button>
       </div>
 
@@ -162,6 +166,29 @@
         <h3>選択中ノード編集</h3>
         <p class="hint" *ngIf="!selectedNode">ノードを選択してください。</p>
         <div *ngIf="selectedNode">
+          <div class="form-row">
+            <label>カテゴリ</label>
+            <input
+              type="text"
+              [(ngModel)]="selectedCategoryName"
+              placeholder="カテゴリ"
+              list="category-options-list"
+            />
+          </div>
+          <div class="form-row">
+            <label>親ノード(任意)</label>
+            <input
+              type="text"
+              [(ngModel)]="selectedParentName"
+              placeholder="親ノード名"
+              list="skill-name-options-list"
+            />
+            <small class="hint">入力すると候補が表示されます。</small>
+          </div>
+          <button class="btn primary" (click)="saveSelectedMetadata()">カテゴリ/親を保存</button>
+          <div class="form-message" [class.error]="metadataSaveIsError" *ngIf="metadataSaveMessage">
+            {{ metadataSaveMessage }}
+          </div>
           <div class="form-row">
             <label>説明</label>
             <textarea rows="4" [(ngModel)]="selectedNode.description"></textarea>
@@ -175,15 +202,25 @@
         <h3>カテゴリ色編集</h3>
         <div class="form-row">
           <label>カテゴリ名</label>
-          <input type="text" [(ngModel)]="editingCategory.name" placeholder="カテゴリ" />
+          <select [(ngModel)]="editingCategory.name" (change)="onEditingCategoryChange($any($event.target).value)">
+            <option value="" disabled>カテゴリを選択</option>
+            <option *ngFor="let c of categoryOptions" [value]="c">{{ c }}</option>
+          </select>
         </div>
         <div class="form-row">
           <label>色</label>
-          <input type="color" [(ngModel)]="editingCategory.color" />
+          <input type="color" class="color-circle-input" [(ngModel)]="editingCategory.color" />
         </div>
         <button class="btn primary" (click)="saveCategoryColor()">カテゴリ色を保存</button>
       </div>
     </div>
+
+    <datalist id="category-options-list">
+      <option *ngFor="let c of categoryOptions" [value]="c"></option>
+    </datalist>
+    <datalist id="skill-name-options-list">
+      <option *ngFor="let name of skillNameOptions" [value]="name"></option>
+    </datalist>
 
     <!-- cytoscape container -->
     <div id="cy" [class.hidden]="viewMode === 'table'"></div>

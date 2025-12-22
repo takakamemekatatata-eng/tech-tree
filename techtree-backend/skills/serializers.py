@@ -14,6 +14,8 @@ class SkillSerializer(serializers.ModelSerializer):
     category = serializers.SlugRelatedField(slug_field='name', queryset=Category.objects.all(), required=False, allow_null=True)
     category_id = serializers.IntegerField(source='category.id', read_only=True)
     category_color = serializers.SerializerMethodField(read_only=True)
+    description = serializers.CharField(required=False, allow_blank=True, default='')
+    user_comment = serializers.CharField(required=False, allow_blank=True, default='')
 
     class Meta:
         model = Skill
