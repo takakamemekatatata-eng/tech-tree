@@ -4,20 +4,35 @@ SET search_path = techtree, public;
 -- clean
 -- =========================
 TRUNCATE TABLE skills RESTART IDENTITY;
+TRUNCATE TABLE categories RESTART IDENTITY CASCADE;
+
+WITH upserted AS (
+  INSERT INTO categories(name, color) VALUES
+    ('Backend', '#60a5fa'),
+    ('Frontend', '#34d399'),
+    ('Infra', '#fbbf24'),
+    ('Database', '#a78bfa'),
+    ('DevOps', '#f472b6'),
+    ('Testing', '#fb7185'),
+    ('Product', '#2dd4bf')
+  ON CONFLICT (name) DO UPDATE SET color = EXCLUDED.color
+  RETURNING id, name
+)
+SELECT 1 FROM upserted;
 
 -- =====================================================
 -- Backend
 -- =====================================================
 WITH backend_root AS (
-  INSERT INTO skills (name, level, category, parent_id, description)
-  VALUES ('Backend', 0, 'Backend', NULL, 'サーバーサイド開発全般')
+  INSERT INTO skills (name, level, category_id, parent_id, description)
+  VALUES ('Backend', 0, (SELECT id FROM categories WHERE name = 'Backend'), NULL, 'サーバーサイド開発全般')
   RETURNING id
 )
-INSERT INTO skills (name, level, category, parent_id, description)
+INSERT INTO skills (name, level, category_id, parent_id, description)
 SELECT
   v.name,
   v.level,
-  'Backend',
+  (SELECT id FROM categories WHERE name = 'Backend'),
   backend_root.id,
   v.description
 FROM backend_root
@@ -38,15 +53,15 @@ CROSS JOIN (
 -- Frontend
 -- =====================================================
 WITH frontend_root AS (
-  INSERT INTO skills (name, level, category, parent_id, description)
-  VALUES ('Frontend', 0, 'Frontend', NULL, 'フロントエンド開発全般')
+  INSERT INTO skills (name, level, category_id, parent_id, description)
+  VALUES ('Frontend', 0, (SELECT id FROM categories WHERE name = 'Frontend'), NULL, 'フロントエンド開発全般')
   RETURNING id
 )
-INSERT INTO skills (name, level, category, parent_id, description)
+INSERT INTO skills (name, level, category_id, parent_id, description)
 SELECT
   v.name,
   v.level,
-  'Frontend',
+  (SELECT id FROM categories WHERE name = 'Frontend'),
   frontend_root.id,
   v.description
 FROM frontend_root
@@ -67,15 +82,15 @@ CROSS JOIN (
 -- Database
 -- =====================================================
 WITH database_root AS (
-  INSERT INTO skills (name, level, category, parent_id, description)
-  VALUES ('Database', 0, 'Database', NULL, 'データベース設計と運用')
+  INSERT INTO skills (name, level, category_id, parent_id, description)
+  VALUES ('Database', 0, (SELECT id FROM categories WHERE name = 'Database'), NULL, 'データベース設計と運用')
   RETURNING id
 )
-INSERT INTO skills (name, level, category, parent_id, description)
+INSERT INTO skills (name, level, category_id, parent_id, description)
 SELECT
   v.name,
   v.level,
-  'Database',
+  (SELECT id FROM categories WHERE name = 'Database'),
   database_root.id,
   v.description
 FROM database_root
@@ -96,15 +111,15 @@ CROSS JOIN (
 -- Infra
 -- =====================================================
 WITH infra_root AS (
-  INSERT INTO skills (name, level, category, parent_id, description)
-  VALUES ('Infra', 0, 'Infra', NULL, 'インフラ基盤')
+  INSERT INTO skills (name, level, category_id, parent_id, description)
+  VALUES ('Infra', 0, (SELECT id FROM categories WHERE name = 'Infra'), NULL, 'インフラ基盤')
   RETURNING id
 )
-INSERT INTO skills (name, level, category, parent_id, description)
+INSERT INTO skills (name, level, category_id, parent_id, description)
 SELECT
   v.name,
   v.level,
-  'Infra',
+  (SELECT id FROM categories WHERE name = 'Infra'),
   infra_root.id,
   v.description
 FROM infra_root
@@ -125,15 +140,15 @@ CROSS JOIN (
 -- DevOps
 -- =====================================================
 WITH devops_root AS (
-  INSERT INTO skills (name, level, category, parent_id, description)
-  VALUES ('DevOps', 0, 'DevOps', NULL, '開発と運用の統合')
+  INSERT INTO skills (name, level, category_id, parent_id, description)
+  VALUES ('DevOps', 0, (SELECT id FROM categories WHERE name = 'DevOps'), NULL, '開発と運用の統合')
   RETURNING id
 )
-INSERT INTO skills (name, level, category, parent_id, description)
+INSERT INTO skills (name, level, category_id, parent_id, description)
 SELECT
   v.name,
   v.level,
-  'DevOps',
+  (SELECT id FROM categories WHERE name = 'DevOps'),
   devops_root.id,
   v.description
 FROM devops_root
@@ -154,15 +169,15 @@ CROSS JOIN (
 -- Testing
 -- =====================================================
 WITH testing_root AS (
-  INSERT INTO skills (name, level, category, parent_id, description)
-  VALUES ('Testing', 0, 'Testing', NULL, 'テスト全般')
+  INSERT INTO skills (name, level, category_id, parent_id, description)
+  VALUES ('Testing', 0, (SELECT id FROM categories WHERE name = 'Testing'), NULL, 'テスト全般')
   RETURNING id
 )
-INSERT INTO skills (name, level, category, parent_id, description)
+INSERT INTO skills (name, level, category_id, parent_id, description)
 SELECT
   v.name,
   v.level,
-  'Testing',
+  (SELECT id FROM categories WHERE name = 'Testing'),
   testing_root.id,
   v.description
 FROM testing_root
@@ -183,15 +198,15 @@ CROSS JOIN (
 -- Product
 -- =====================================================
 WITH product_root AS (
-  INSERT INTO skills (name, level, category, parent_id, description)
-  VALUES ('Product', 0, 'Product', NULL, 'プロダクト開発')
+  INSERT INTO skills (name, level, category_id, parent_id, description)
+  VALUES ('Product', 0, (SELECT id FROM categories WHERE name = 'Product'), NULL, 'プロダクト開発')
   RETURNING id
 )
-INSERT INTO skills (name, level, category, parent_id, description)
+INSERT INTO skills (name, level, category_id, parent_id, description)
 SELECT
   v.name,
   v.level,
-  'Product',
+  (SELECT id FROM categories WHERE name = 'Product'),
   product_root.id,
   v.description
 FROM product_root

@@ -11,6 +11,9 @@
         <button class="btn" (click)="toggleViewMode()">
           {{ viewMode === 'graph' ? '表表示に切替' : 'ツリー表示に切替' }}
         </button>
+        <button class="btn" [class.active]="editingMode" [disabled]="viewMode === 'table'" (click)="toggleEditingMode()">
+          編集モード
+        </button>
         <button class="btn" *ngIf="viewMode === 'table'" (click)="downloadCsv()">CSV</button>
         <button class="btn" *ngIf="viewMode === 'graph'" (click)="downloadPng()">PNG</button>
       </div>
@@ -79,7 +82,7 @@
           <strong>Level:</strong>
           <div class="level-controls">
             <button class="btn small" (click)="decrementLevel()" title="Decrease">－</button>
-            <input type="number" [value]="selectedLevel" (input)="onLevelInput($event.target.value)" min="0" />
+            <input type="number" [value]="selectedLevel" (input)="onLevelInput($event.target.value)" min="0" max="5" />
             <button class="btn small" (click)="incrementLevel()" title="Increase">＋</button>
           </div>
           <div class="save-message" *ngIf="saveMessage" [class.error]="saveError">{{ saveMessage }}</div>
@@ -103,6 +106,63 @@
   </aside>
 
   <main class="main-area">
+    <div class="editor-panel" *ngIf="viewMode === 'graph' && editingMode">
+      <div class="editor-card">
+        <h3>ノード追加</h3>
+        <div class="form-row">
+          <label>名前</label>
+          <input type="text" [(ngModel)]="newSkill.name" placeholder="スキル名" />
+        </div>
+        <div class="form-row">
+          <label>カテゴリ</label>
+          <input type="text" [(ngModel)]="newSkill.category" placeholder="カテゴリ" />
+        </div>
+        <div class="form-row">
+          <label>カテゴリ色</label>
+          <input type="color" [(ngModel)]="newSkill.color" />
+        </div>
+        <div class="form-row">
+          <label>レベル(0-5)</label>
+          <input type="number" min="0" max="5" [(ngModel)]="newSkill.level" />
+        </div>
+        <div class="form-row">
+          <label>親ID</label>
+          <input type="number" [(ngModel)]="newSkill.parent_id" placeholder="親ノードID" />
+        </div>
+        <div class="form-row">
+          <label>説明</label>
+          <textarea rows="2" [(ngModel)]="newSkill.description"></textarea>
+        </div>
+        <button class="btn primary" (click)="createSkill()">ノードを追加</button>
+      </div>
+
+      <div class="editor-card">
+        <h3>選択中ノード編集</h3>
+        <p class="hint" *ngIf="!selectedNode">ノードを選択してください。</p>
+        <div *ngIf="selectedNode">
+          <div class="form-row">
+            <label>説明</label>
+            <textarea rows="4" [(ngModel)]="selectedNode.description"></textarea>
+          </div>
+          <button class="btn primary" (click)="saveDescription()">説明を保存</button>
+          <button class="btn danger" (click)="deleteSelectedSkill()">ノードを削除</button>
+        </div>
+      </div>
+
+      <div class="editor-card">
+        <h3>カテゴリ色編集</h3>
+        <div class="form-row">
+          <label>カテゴリ名</label>
+          <input type="text" [(ngModel)]="editingCategory.name" placeholder="カテゴリ" />
+        </div>
+        <div class="form-row">
+          <label>色</label>
+          <input type="color" [(ngModel)]="editingCategory.color" />
+        </div>
+        <button class="btn primary" (click)="saveCategoryColor()">カテゴリ色を保存</button>
+      </div>
+    </div>
+
     <!-- cytoscape container -->
     <div id="cy" [class.hidden]="viewMode === 'table'"></div>
 
@@ -129,7 +189,13 @@
               <td>{{ row.name || row.label }}</td>
               <td>{{ row.category }}</td>
               <td class="editable-cell">
-                <input type="number" min="0" [value]="row.level" (blur)="onTableLevelBlur(row, $any($event.target).value)" />
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  [value]="row.level"
+                  (blur)="onTableLevelBlur(row, $any($event.target).value)"
+                />
               </td>
               <td class="description-cell">{{ row.description || '' }}</td>
               <td class="editable-cell">

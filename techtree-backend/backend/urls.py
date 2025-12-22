@@ -17,10 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from skills.views import SkillViewSet
+from skills.views import SkillViewSet, CategoryViewSet
 
 router = DefaultRouter()
 router.register(r'skills', SkillViewSet, basename='skill')
+router.register(r'categories', CategoryViewSet, basename='category')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

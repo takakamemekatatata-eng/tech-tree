@@ -7,9 +7,11 @@ export const layoutConfig = {
     edgeSep: 30,
     padding: 20
   },
-  grid: {
-    name: 'grid',
-    padding: 20
+  breadthfirst: {
+    name: 'breadthfirst',
+    directed: true,
+    padding: 20,
+    spacingFactor: 1.4
   }
 } as const;
 
