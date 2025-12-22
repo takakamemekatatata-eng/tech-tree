@@ -11,11 +11,24 @@
         <button class="btn" (click)="toggleViewMode()">
           {{ viewMode === 'graph' ? '表表示に切替' : 'ツリー表示に切替' }}
         </button>
-        <button class="btn" [class.active]="editingMode" [disabled]="viewMode === 'table'" (click)="toggleEditingMode()">
+        <button
+          class="btn"
+          [class.active]="editingMode"
+          [disabled]="viewMode === 'table'"
+          (click)="toggleEditingMode()"
+          title="グラフ編集（ノード移動・追加・削除・カテゴリ色変更）を有効化"
+        >
           編集モード
         </button>
         <button class="btn" *ngIf="viewMode === 'table'" (click)="downloadCsv()">CSV</button>
         <button class="btn" *ngIf="viewMode === 'graph'" (click)="downloadPng()">PNG</button>
+      </div>
+      <div class="edit-mode-helper" *ngIf="viewMode === 'graph'">
+        <span class="edit-pill" [class.on]="editingMode">{{ editingMode ? '編集ON' : '編集OFF' }}</span>
+        <span class="edit-hint" *ngIf="editingMode">
+          ノードをドラッグで配置調整しつつ、下のフォームで追加 / 説明変更 / 削除ができます。
+        </span>
+        <span class="edit-hint" *ngIf="!editingMode">編集が必要なときだけONにしてください。</span>
       </div>
     </div>
 
@@ -107,6 +120,15 @@
 
   <main class="main-area">
     <div class="editor-panel" *ngIf="viewMode === 'graph' && editingMode">
+      <div class="editor-card info-card">
+        <h3>編集モードの使い方</h3>
+        <ol class="edit-steps">
+          <li><strong>ノードをクリック</strong>して詳細を開きます。位置はドラッグで調整できます（表示のみ）。</li>
+          <li>新しいノードを作る場合は「ノード追加」で <strong>親ID</strong> を指定して保存します。</li>
+          <li>選択中ノードは説明を上書き保存できます。不要なら「ノードを削除」を押してください。</li>
+          <li>カテゴリ名と色を入力して「カテゴリ色を保存」を押すと、グラフ全体に即時反映されます。</li>
+        </ol>
+      </div>
       <div class="editor-card">
         <h3>ノード追加</h3>
         <div class="form-row">

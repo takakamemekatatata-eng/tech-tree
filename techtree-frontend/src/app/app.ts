@@ -463,6 +463,8 @@ export class AppComponent implements OnInit, AfterViewInit {
       this.cy.elements().remove();
       this.cy.add(elements);
 
+      this.syncEditingModeInteractions();
+
       // make level nodes ungrabify (prevent direct dragging) and unselectify (prevent direct selection)
       this.cy.nodes('.level-node').forEach((lvl: any) => {
         try {
@@ -497,6 +499,17 @@ export class AppComponent implements OnInit, AfterViewInit {
       }, 100);
     } finally {
       this.cy.endBatch();
+    }
+  }
+
+  private syncEditingModeInteractions() {
+    if (!this.cy) return;
+
+    const mainNodes = this.cy.nodes(':not(.level-node)');
+    if (this.editingMode) {
+      if ((mainNodes as any).grabify) (mainNodes as any).grabify();
+    } else {
+      if ((mainNodes as any).ungrabify) (mainNodes as any).ungrabify();
     }
   }
 
@@ -636,6 +649,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   toggleEditingMode() {
     if (this.viewMode !== 'graph') return;
     this.editingMode = !this.editingMode;
+    this.syncEditingModeInteractions();
   }
 
   private clampLevelValue(value: number) {
@@ -1004,6 +1018,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.viewMode = nextMode ?? (this.viewMode === 'graph' ? 'table' : 'graph');
     if (this.viewMode === 'table' && this.editingMode) {
       this.editingMode = false;
+      this.syncEditingModeInteractions();
     }
 
     if (this.viewMode === 'graph' && this.cy) {
