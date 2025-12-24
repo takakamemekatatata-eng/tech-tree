@@ -1,4 +1,3 @@
-from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
@@ -13,7 +12,11 @@ class Node(models.Model):
     node_type = models.CharField(max_length=50, choices=NODE_TYPE_CHOICES, default='technology')
     category = models.CharField(max_length=100, blank=True, default='')
     description = models.TextField(blank=True, default='')
-    tags = ArrayField(models.CharField(max_length=50), default=list, blank=True)
+    level = models.IntegerField(
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(5)],
+        help_text='Skill level between 0 and 5'
+    )
 
     class Meta:
         managed = False
@@ -41,7 +44,6 @@ class Relation(models.Model):
     )
     relation_type = models.CharField(max_length=50, choices=RELATION_TYPE_CHOICES)
     strength = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(1.0)], default=0.5)
-    context = models.CharField(max_length=100, blank=True, null=True)
 
     class Meta:
         managed = False

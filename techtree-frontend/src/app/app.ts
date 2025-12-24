@@ -1,6 +1,7 @@
 import { Component, OnInit, AfterViewInit, ChangeDetectorRef, NgZone, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import { layoutConfig, levelNodeConfig, mainLabelConfig } from './visual-config';
@@ -13,7 +14,7 @@ import { GraphDataService } from './features/graph/services/graph-data.service';
 cytoscape.use(dagre);
 
 @Component({
-  selector: 'app-root',
+  selector: 'app-graph-view',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './app.html',
@@ -97,6 +98,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   constructor(
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone,
+    private router: Router,
     private apiService: TechTreeApiService,
     private graphDataService: GraphDataService
   ) { }
@@ -929,8 +931,8 @@ export class AppComponent implements OnInit, AfterViewInit {
     const payload = {
       name,
       category,
+      level: this.clampLevelValue(level),
       description: this.newSkill.description ?? '',
-      tags: [] as string[],
       node_type: 'technology'
     };
 
@@ -1458,6 +1460,10 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.refreshTableRows();
   }
 
+  goToSelectionPage() {
+    this.router.navigate(['/selection']);
+  }
+
   downloadCsv() {
     if (!this.filteredTableRows || this.filteredTableRows.length === 0) return;
 
@@ -1627,7 +1633,7 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   private async saveSkill(
     skillId: number,
-    payload: { level?: number; user_comment?: string; description?: string; category?: string; tags?: string[] },
+    payload: { level?: number; user_comment?: string; description?: string; category?: string },
     originalLevel?: number
   ) {
     if (!payload || Object.keys(payload).length === 0) return;
@@ -1635,7 +1641,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     const allowedPayload: any = {};
     if (payload.description !== undefined) allowedPayload.description = payload.description;
     if (payload.category !== undefined) allowedPayload.category = payload.category;
-    if (payload.tags !== undefined) allowedPayload.tags = payload.tags;
+    if (payload.level !== undefined) allowedPayload.level = this.clampLevelValue(payload.level);
 
     if (Object.keys(allowedPayload).length > 0) {
       await this.apiService.updateSkill(skillId, allowedPayload);

@@ -33,8 +33,7 @@ export class GraphDataService {
         color: categoryColors[skill.category] ?? '#d1d5db',
         level: skill.level,
         description: skill.description,
-        user_comment: skill.user_comment,
-        tags: skill.tags ?? []
+        user_comment: skill.user_comment
       }
     }));
 
@@ -49,8 +48,7 @@ export class GraphDataService {
             source: `skill-${from}`,
             target: `skill-${to}`,
             relation_type: relation.relation_type,
-            strength: relation.strength,
-            context: relation.context
+            strength: relation.strength
           }
         } as ElementDefinition;
       })

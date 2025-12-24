@@ -25,7 +25,6 @@ class RelationViewSet(viewsets.ModelViewSet):
         relation_type = self.request.query_params.get('relation_type')
         min_strength = self.request.query_params.get('min_strength')
         max_strength = self.request.query_params.get('max_strength')
-        context = self.request.query_params.get('context')
 
         if relation_type:
             queryset = queryset.filter(relation_type=relation_type)
@@ -39,6 +38,4 @@ class RelationViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(strength__lte=float(max_strength))
             except ValueError:
                 pass
-        if context:
-            queryset = queryset.filter(context=context)
         return queryset

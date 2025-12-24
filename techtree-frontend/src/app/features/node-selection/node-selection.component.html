@@ -1,0 +1,81 @@
+<div class="selection-page">
+  <header class="selection-header">
+    <div>
+      <p class="eyebrow">カードエクスポート</p>
+      <h1>Lv1以上のノードを選択</h1>
+      <p class="hint">最大{{ maxSelectable }}件まで選択してカード形式で出力できます。</p>
+    </div>
+    <div class="header-actions">
+      <a routerLink="/" class="btn ghost">ツリーに戻る</a>
+      <button class="btn primary" (click)="downloadCardsPng()" [disabled]="selectedSkills.length === 0 || exporting">
+        {{ exporting ? '書き出し中...' : 'カードをPNG保存' }}
+      </button>
+    </div>
+  </header>
+
+  <section class="selectors">
+    <div class="toolbar">
+      <div class="input-group">
+        <label for="search">検索</label>
+        <input
+          id="search"
+          type="text"
+          [value]="searchTerm"
+          (input)="applySearch($any($event.target).value)"
+          placeholder="名前またはカテゴリ"
+        />
+      </div>
+      <div class="counts">
+        <span>選択可能: {{ filteredSkills.length }}件</span>
+        <span>選択中: {{ selectedSkills.length }} / {{ maxSelectable }}</span>
+        <button class="btn" (click)="clearSelection()" [disabled]="selectedSkills.length === 0">クリア</button>
+      </div>
+    </div>
+
+    <div class="status" *ngIf="loading">読み込み中...</div>
+    <div class="status error" *ngIf="error">{{ error }}</div>
+    <div class="status error" *ngIf="selectionError">{{ selectionError }}</div>
+
+    <div class="options" *ngIf="!loading && !error">
+      <label class="option" *ngFor="let skill of filteredSkills" [class.selected]="isSelected(skill)">
+        <input type="checkbox" [checked]="isSelected(skill)" (change)="toggleSelection(skill)" />
+        <div class="option-body">
+          <div class="option-title">{{ displayName(skill) }}</div>
+          <div class="option-meta">
+            <span class="badge">Lv{{ skill.level }}</span>
+            <span class="badge light">{{ skill.category }}</span>
+          </div>
+          <p class="option-desc">{{ skill.description || '説明が登録されていません。' }}</p>
+        </div>
+      </label>
+    </div>
+  </section>
+
+  <section class="card-preview">
+    <div class="card-header-row">
+      <h2>選択したノード ({{ selectedSkills.length }}件)</h2>
+      <div class="card-actions">
+        <button class="btn" (click)="backToGraph()">ツリーを表示</button>
+        <button class="btn primary" (click)="downloadCardsPng()" [disabled]="selectedSkills.length === 0 || exporting">
+          {{ exporting ? '書き出し中...' : 'カードPNGを出力' }}
+        </button>
+      </div>
+    </div>
+    <div class="status" *ngIf="selectedSkills.length === 0">
+      ノードを選択するとここにカードが表示されます。
+    </div>
+    <div #cardList class="card-grid" *ngIf="selectedSkills.length > 0">
+      <article class="card" *ngFor="let skill of selectedSkills">
+        <div class="card-top">
+          <div>
+            <p class="card-category">{{ skill.category }}</p>
+            <h3 class="card-title">{{ displayName(skill) }}</h3>
+          </div>
+          <span class="level-pill">Lv{{ skill.level }}</span>
+        </div>
+        <p class="card-desc">{{ skill.description || '説明が登録されていません。' }}</p>
+      </article>
+    </div>
+    <div class="status error" *ngIf="exportError">{{ exportError }}</div>
+  </section>
+</div>

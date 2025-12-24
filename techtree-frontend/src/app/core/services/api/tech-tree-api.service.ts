@@ -19,8 +19,8 @@ export class TechTreeApiService {
   async createSkill(payload: {
     name: string;
     category: string;
+    level: number;
     description?: string;
-    tags?: string[];
     node_type?: string;
   }): Promise<Skill> {
     const response = await axios.post(`${environment.apiUrl}/nodes/`, payload);

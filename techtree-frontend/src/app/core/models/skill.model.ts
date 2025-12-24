@@ -7,5 +7,4 @@ export interface Skill {
   description?: string;
   user_comment?: string;
   parent_id?: number | null;
-  tags?: string[];
 }

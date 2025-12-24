@@ -3,11 +3,9 @@ from .models import Node, Relation
 
 
 class NodeSerializer(serializers.ModelSerializer):
-    tags = serializers.ListField(child=serializers.CharField(), allow_empty=True, required=False)
-
     class Meta:
         model = Node
-        fields = ['id', 'name', 'node_type', 'category', 'description', 'tags']
+        fields = ['id', 'name', 'node_type', 'category', 'description', 'level']
 
 
 class RelationSerializer(serializers.ModelSerializer):
@@ -16,4 +14,4 @@ class RelationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Relation
-        fields = ['id', 'from_node_id', 'to_node_id', 'relation_type', 'strength', 'context']
+        fields = ['id', 'from_node_id', 'to_node_id', 'relation_type', 'strength']

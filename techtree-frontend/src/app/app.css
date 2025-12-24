@@ -4,12 +4,18 @@
 /* =========================
    グローバル土台（超重要）
    ========================= */
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
 html, body {
   height: 100%;
   margin: 0;
 }
 
-app-root {
+app-graph-view {
   display: flex;
   flex-direction: column;
   height: 100vh;
