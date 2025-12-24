@@ -21,7 +21,7 @@
           編集モード
         </button>
         <button class="btn" *ngIf="viewMode === 'table'" (click)="downloadCsv()">CSV</button>
-        <button class="btn" *ngIf="viewMode === 'graph'" (click)="downloadPng()">PNG</button>
+        <button class="btn" *ngIf="viewMode === 'graph'" (click)="downloadPng()">PNG出力</button>
         <button class="btn" (click)="goToSelectionPage()">カード選択画面</button>
       </div>
       <div class="edit-mode-helper" *ngIf="viewMode === 'graph'">

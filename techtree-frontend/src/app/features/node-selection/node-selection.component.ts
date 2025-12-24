@@ -18,6 +18,8 @@ export class NodeSelectionComponent implements OnInit {
   skills: Skill[] = [];
   filteredSkills: Skill[] = [];
   selectedSkillIds = new Set<number>();
+  selectedSkillOrder: number[] = [];
+  draggingCardId: number | null = null;
   loading = false;
   error = '';
   selectionError = '';
@@ -39,7 +41,6 @@ export class NodeSelectionComponent implements OnInit {
       const skills = await this.apiService.fetchSkills();
       this.skills = (skills ?? [])
         .map((skill) => ({ ...skill, level: skill.level ?? 0 }))
-        .filter((skill) => (skill.level ?? 0) >= 1)
         .sort((a, b) => {
           if (b.level === a.level) {
             return (a.name ?? a.label ?? '').localeCompare(b.name ?? b.label ?? '');
@@ -47,6 +48,7 @@ export class NodeSelectionComponent implements OnInit {
           return (b.level ?? 0) - (a.level ?? 0);
         });
       this.filteredSkills = [...this.skills];
+      this.reconcileSelectedOrder();
     } catch (err) {
       console.error('Failed to load skills', err);
       this.error = 'ノードの取得に失敗しました。時間をおいて再度お試しください。';
@@ -56,7 +58,14 @@ export class NodeSelectionComponent implements OnInit {
   }
 
   get selectedSkills(): Skill[] {
-    return this.skills.filter((skill) => this.selectedSkillIds.has(skill.id));
+    const skillMap = new Map(this.skills.map((skill) => [skill.id, skill]));
+    const ordered = this.selectedSkillOrder
+      .map((id) => skillMap.get(id))
+      .filter((skill): skill is Skill => Boolean(skill));
+    const missing = this.skills.filter(
+      (skill) => this.selectedSkillIds.has(skill.id) && !this.selectedSkillOrder.includes(skill.id)
+    );
+    return [...ordered, ...missing];
   }
 
   displayName(skill: Skill) {
@@ -71,6 +80,7 @@ export class NodeSelectionComponent implements OnInit {
     this.selectionError = '';
     if (this.selectedSkillIds.has(skill.id)) {
       this.selectedSkillIds.delete(skill.id);
+      this.selectedSkillOrder = this.selectedSkillOrder.filter((id) => id !== skill.id);
       return;
     }
 
@@ -80,6 +90,9 @@ export class NodeSelectionComponent implements OnInit {
     }
 
     this.selectedSkillIds.add(skill.id);
+    if (!this.selectedSkillOrder.includes(skill.id)) {
+      this.selectedSkillOrder = [...this.selectedSkillOrder, skill.id];
+    }
   }
 
   applySearch(term: string) {
@@ -98,6 +111,7 @@ export class NodeSelectionComponent implements OnInit {
 
   clearSelection() {
     this.selectedSkillIds.clear();
+    this.selectedSkillOrder = [];
     this.selectionError = '';
   }
 
@@ -193,5 +207,47 @@ export class NodeSelectionComponent implements OnInit {
     const height = Math.ceil(element.scrollHeight || element.offsetHeight || 600);
     const svgDataUrl = this.buildSvgDataUrl(element, width, height);
     return this.svgToPng(svgDataUrl, width, height);
+  }
+
+  private reconcileSelectedOrder() {
+    const availableIds = new Set(this.skills.map((s) => s.id));
+    this.selectedSkillOrder = this.selectedSkillOrder.filter(
+      (id) => availableIds.has(id) && this.selectedSkillIds.has(id)
+    );
+    this.selectedSkillIds = new Set(this.selectedSkillOrder);
+  }
+
+  onCardDragStart(skillId: number) {
+    this.draggingCardId = skillId;
+  }
+
+  onCardDragEnter(targetId: number) {
+    if (this.draggingCardId == null || this.draggingCardId === targetId) return;
+    this.reorderSelectedSkills(this.draggingCardId, targetId);
+  }
+
+  onCardDragOver(event: DragEvent) {
+    event.preventDefault();
+  }
+
+  onCardDrop(event: DragEvent, targetId: number) {
+    event.preventDefault();
+    this.onCardDragEnter(targetId);
+    this.draggingCardId = null;
+  }
+
+  onCardDragEnd() {
+    this.draggingCardId = null;
+  }
+
+  private reorderSelectedSkills(sourceId: number, targetId: number) {
+    const order = [...this.selectedSkillOrder];
+    const fromIndex = order.indexOf(sourceId);
+    const toIndex = order.indexOf(targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, sourceId);
+    this.selectedSkillOrder = order;
   }
 }

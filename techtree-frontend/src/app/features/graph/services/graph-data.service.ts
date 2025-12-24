@@ -37,6 +37,16 @@ export class GraphDataService {
       }
     }));
 
+    const levelNodes: ElementDefinition[] = skills.map((skill) => ({
+      data: {
+        id: `skill-${skill.id}-level`,
+        label: this.levelToStars(skill.level),
+        level: skill.level,
+        attachedTo: `skill-${skill.id}`
+      },
+      classes: 'level-node'
+    }));
+
     const edgeElements: ElementDefinition[] = relations
       .map((relation) => {
         const from = relation.from_node_id ?? relation.from_node?.id;
@@ -55,7 +65,7 @@ export class GraphDataService {
       .filter((el): el is ElementDefinition => Boolean(el));
 
     return {
-      elements: [...nodeElements, ...edgeElements],
+      elements: [...nodeElements, ...levelNodes, ...edgeElements],
       categoryColors,
       categoryList
     };
@@ -72,5 +82,10 @@ export class GraphDataService {
   private generateRandomColor() {
     const component = () => Math.floor(Math.random() * 156 + 80).toString(16).padStart(2, '0');
     return `#${component()}${component()}${component()}`;
+  }
+
+  private levelToStars(level: number | string | null | undefined) {
+    const l = Math.max(0, Math.min(5, Number(level) || 0));
+    return l === 0 ? '☆' : '★'.repeat(l);
   }
 }

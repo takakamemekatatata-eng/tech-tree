@@ -93,6 +93,11 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly layoutConfig = layoutConfig;
   readonly levelNodeConfig = levelNodeConfig;
   readonly mainLabelConfig = mainLabelConfig;
+  readonly nodeSize = {
+    width: 140,
+    height: 88,
+    labelMaxWidth: 120
+  };
 
   // inject ChangeDetectorRef and NgZone so Cytoscape callbacks can update Angular view
   constructor(
@@ -172,10 +177,10 @@ export class AppComponent implements OnInit, AfterViewInit {
             'text-margin-y': this.mainLabelConfig.textMarginY,
             'text-halign': this.mainLabelConfig.textHalign,
             'text-wrap': 'wrap',
-            'text-max-width': '120px',
+            'text-max-width': `${this.nodeSize.labelMaxWidth}px`,
             'font-size': '14px',
-            'width': 'mapData(level, 1, 5, 80, 160)',
-            'height': 'mapData(level, 1, 5, 56, 96)'
+            'width': `${this.nodeSize.width}px`,
+            'height': `${this.nodeSize.height}px`
           }
         },
         // Level node style (small/italic/monospace inside parent)
@@ -183,12 +188,14 @@ export class AppComponent implements OnInit, AfterViewInit {
           selector: 'node.level-node',
           style: {
             'label': 'data(label)',
-            'font-size': '11px',
-            'font-style': 'italic',
-            'font-family': 'Courier New, monospace',
+            'font-size': '12px',
+            'font-weight': 700,
+            'font-style': 'normal',
+            'font-family': 'Inter, "Segoe UI", Arial, sans-serif',
             'color': '#333',
-            'text-valign': 'bottom',
-            'text-margin-y': -4,
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'text-margin-y': 0,
             'background-opacity': 0,
             'border-width': 0,
             'width': '80px',
@@ -212,7 +219,8 @@ export class AppComponent implements OnInit, AfterViewInit {
             'border-width': 3,
             'border-color': '#FFD54F',
             'background-color': '#fff',
-            'width': 'mapData(level, 1, 5, 90, 180)'
+            'width': `${this.nodeSize.width}px`,
+            'height': `${this.nodeSize.height}px`
           }
         },
         {
@@ -222,7 +230,8 @@ export class AppComponent implements OnInit, AfterViewInit {
             'border-width': 4,
             'border-color': '#FF5A5F',
             'background-color': '#ffffff',
-            'width': 'mapData(level, 1, 5, 100, 200)'
+            'width': `${this.nodeSize.width}px`,
+            'height': `${this.nodeSize.height}px`
           }
         },
         {
@@ -447,7 +456,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     if (!elements || elements.length === 0) {
       elements = [
         { data: { id: 'skill-1', label: 'Demo Node', category: 'Backend', level: 2 } },
-        { data: { id: 'skill-1-level', label: 'Lv.2', level: 2, attachedTo: 'skill-1' }, classes: 'level-node' }
+        { data: { id: 'skill-1-level', label: this.levelToStars(2), level: 2, attachedTo: 'skill-1' }, classes: 'level-node' }
       ];
       console.warn('No elements provided; adding a demo node for debugging.');
     }
@@ -501,11 +510,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     if (!this.cy) return;
 
     const mainNodes = this.cy.nodes(':not(.level-node)');
-    if (this.editingMode) {
-      if ((mainNodes as any).grabify) (mainNodes as any).grabify();
-    } else {
-      if ((mainNodes as any).ungrabify) (mainNodes as any).ungrabify();
-    }
+    if ((mainNodes as any).grabify) (mainNodes as any).grabify();
   }
 
   levelToStars(level: number | string | null | undefined) {

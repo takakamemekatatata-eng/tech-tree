@@ -1,0 +1,952 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/techtree-frontend/src/app/app.css b/techtree-frontend/src/app/app.css
+index 275f6779f25e328d931b2b93661744a35e05e178..ea6c36010f88761cc211ced25e686ee06ec1ff78 100644
+--- a/techtree-frontend/src/app/app.css
++++ b/techtree-frontend/src/app/app.css
+@@ -71,50 +71,51 @@ app-graph-view {
+   gap: 4px;
+   padding: 4px 8px;
+   border-radius: 999px;
+   background: #f3f4f6;
+   border: 1px solid #e5e7eb;
+   font-weight: 600;
+ }
+ 
+ .edit-pill.on {
+   background: #dbebff;
+   color: #1d4ed8;
+   border-color: #93c5fd;
+ }
+ 
+ .edit-hint {
+   color: #6b7280;
+ }
+ 
+ .btn {
+   border: 1px solid #ddd;
+   background: linear-gradient(180deg, #fff, #f3f4f6);
+   padding: 6px 8px;
+   border-radius: 6px;
+   cursor: pointer;
+   transition: transform 120ms ease, box-shadow 120ms ease;
++  color: #111827;
+ }
+ 
+ .btn:hover {
+   background: #eef2ff;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+ }
+ 
+ .btn.active {
+   border-color: var(--accent);
+   background: #e0f2fe;
+ }
+ 
+ .btn.primary {
+   background: #2563eb;
+   color: #fff;
+   border-color: #1d4ed8;
+ }
+ 
+ .btn.danger {
+   background: #ef4444;
+   color: #fff;
+   border-color: #dc2626;
+ }
+ 
+ .search-container {
+@@ -179,50 +180,52 @@ app-graph-view {
+   align-items: center;
+   gap: 8px;
+   padding: 4px 0;
+ }
+ 
+ .checkbox-row input {
+   margin: 0;
+ }
+ 
+ 
+ /* =========================
+    Body（ここが肝）
+    ========================= */
+ .app-body {
+   flex: 1;
+   display: flex;
+   overflow: hidden;
+   min-height: 0;   /* ← これが決定打 */
+ }
+ 
+ /* =========================
+    Sidebar
+    ========================= */
+ .details {
+   width: var(--sidebar-width);
++  min-width: var(--sidebar-width);
++  max-width: var(--sidebar-width);
+   flex-shrink: 0;
+   padding: 12px;
+   border-right: 1px solid #e9ecef;
+   background: #fff;
+   overflow-y: auto;
+   transition: width 200ms ease;
+ }
+ 
+ .details.collapsed {
+   width: 0;
+   padding: 0;
+   overflow: hidden;
+ }
+ 
+ /* =========================
+    Main / Cytoscape
+    ========================= */
+ .main-area {
+   flex: 1;
+   position: relative;
+   min-height: 0;
+   display: flex;
+   flex-direction: column;
+ }
+ 
+@@ -411,50 +414,52 @@ app-graph-view {
+   gap: 8px;
+   align-items: center;
+   margin-left: 8px;
+ }
+ 
+ .level-controls input[type="number"] {
+   width: 64px;
+   padding: 6px;
+   border-radius: 6px;
+   border: 1px solid #ddd;
+   text-align: center;
+ }
+ 
+ .detail-row {
+   margin-bottom: 12px;
+   display: flex;
+   flex-direction: column;
+   gap: 6px;
+ }
+ 
+ .description-text {
+   margin: 0;
+   line-height: 1.6;
+   color: #333;
+   white-space: pre-wrap;
++  word-break: break-word;
++  overflow-wrap: anywhere;
+ }
+ 
+ .details textarea {
+   width: 100%;
+   border-radius: 6px;
+   border: 1px solid #ced4da;
+   padding: 8px;
+   font-size: 14px;
+   resize: vertical;
+ }
+ 
+ .btn.small {
+   padding: 4px 6px;
+   font-size: 12px;
+ }
+ 
+ .save-message {
+   margin-top: 6px;
+   color: #2f9e44; /* green for success; changes to red on failure via content */
+   font-size: 13px;
+ }
+ 
+ /* error variant for save messages */
+ .save-message.error {
+   color: #e03131;
+diff --git a/techtree-frontend/src/app/app.html b/techtree-frontend/src/app/app.html
+index bc7638bd37207cbad752b388d3241225d3917750..1f481281c28c483750af6c42bf0a046183f4e7b8 100644
+--- a/techtree-frontend/src/app/app.html
++++ b/techtree-frontend/src/app/app.html
+@@ -1,49 +1,49 @@
+ <header class="app-header">
+   <div class="header-inner">
+     <div class="left-area">
+       <div class="logo">Techtree</div>
+       <div class="toolbar">
+         <button class="btn" (click)="fit()">Fit</button>
+         <button class="btn" (click)="zoomIn()">＋</button>
+         <button class="btn" (click)="zoomOut()">－</button>
+         <button class="btn" (click)="switchLayout()">Layout</button>
+         <button class="btn" (click)="toggleSidebar()" title="Toggle details">≡</button>
+         <button class="btn" (click)="toggleViewMode()">
+           {{ viewMode === 'graph' ? '表表示に切替' : 'ツリー表示に切替' }}
+         </button>
+         <button
+           class="btn"
+           [class.active]="editingMode"
+           [disabled]="viewMode === 'table'"
+           (click)="toggleEditingMode()"
+           title="グラフ編集（ノード移動・追加・削除・カテゴリ色変更）を有効化"
+         >
+           編集モード
+         </button>
+         <button class="btn" *ngIf="viewMode === 'table'" (click)="downloadCsv()">CSV</button>
+-        <button class="btn" *ngIf="viewMode === 'graph'" (click)="downloadPng()">PNG</button>
++        <button class="btn" *ngIf="viewMode === 'graph'" (click)="downloadPng()">PNG出力</button>
+         <button class="btn" (click)="goToSelectionPage()">カード選択画面</button>
+       </div>
+       <div class="edit-mode-helper" *ngIf="viewMode === 'graph'">
+         <span class="edit-pill" [class.on]="editingMode">{{ editingMode ? '編集ON' : '編集OFF' }}</span>
+         <span class="edit-hint" *ngIf="editingMode">
+           ノードをドラッグで配置調整しつつ、下のフォームで追加 / 説明変更 / 削除ができます。
+         </span>
+         <span class="edit-hint" *ngIf="!editingMode">編集が必要なときだけONにしてください。</span>
+       </div>
+     </div>
+ 
+     <div class="search-container">
+       <div class="search-controls">
+         <input type="text" placeholder="検索..." aria-label="search" (input)="applySearch($any($event.target).value)" />
+ 
+         <div class="filters">
+           <div class="filter dropdown" [class.open]="levelMenuOpen">
+             <button class="btn filter-trigger" type="button" (click)="toggleLevelMenu()">
+               レベル ({{ levelSelectionLabel }})
+             </button>
+             <div class="filter-menu" *ngIf="levelMenuOpen">
+               <label *ngFor="let l of levelOptions" class="checkbox-row">
+                 <input
+                   type="checkbox"
+                   [checked]="selectedLevels.has(l)"
+diff --git a/techtree-frontend/src/app/app.ts b/techtree-frontend/src/app/app.ts
+index f2dc0da318b8426b0a9738949ed55d31b1ceca73..8d0a7356bad0a2bd96108ec03c188c95d972a522 100644
+--- a/techtree-frontend/src/app/app.ts
++++ b/techtree-frontend/src/app/app.ts
+@@ -71,50 +71,55 @@ export class AppComponent implements OnInit, AfterViewInit {
+   relationTypeOptions = ['prerequisite', 'used_with', 'alternative', 'related', 'built_on'];
+   selectedConnections: {
+     id: number;
+     direction: 'incoming' | 'outgoing';
+     targetName: string;
+     relation_type: string;
+     strength: number;
+   }[] = [];
+   connectionForm = {
+     targetName: '',
+     relationType: 'prerequisite',
+     direction: 'outgoing' as 'outgoing' | 'incoming',
+     strength: 0.5
+   };
+   connectionError = '';
+   connectionNotice = '';
+   selectedConnectionId: number | null = null;
+ 
+   // --------------------------
+   // Centralized layout config
+   // --------------------------
+   // replaced inline definitions with imported configs
+   readonly layoutConfig = layoutConfig;
+   readonly levelNodeConfig = levelNodeConfig;
+   readonly mainLabelConfig = mainLabelConfig;
++  readonly nodeSize = {
++    width: 140,
++    height: 88,
++    labelMaxWidth: 120
++  };
+ 
+   // inject ChangeDetectorRef and NgZone so Cytoscape callbacks can update Angular view
+   constructor(
+     private cdr: ChangeDetectorRef,
+     private ngZone: NgZone,
+     private router: Router,
+     private apiService: TechTreeApiService,
+     private graphDataService: GraphDataService
+   ) { }
+ 
+   // Helper: return layout options for a layout name
+   getLayoutOptions(layoutName?: string) {
+     const name = layoutName ?? this.layoutName;
+     // Use `any` to avoid typing issues with cytoscape layout typed options
+     return (this.layoutConfig as any)[name] ?? (this.layoutConfig as any).dagre;
+   }
+ 
+   async ngOnInit() {
+     try {
+       const [skillsResponse, relationResponse] = await Promise.all([
+         this.apiService.fetchSkills(),
+         this.apiService.fetchRelations()
+       ]);
+       const skills = (skillsResponse ?? []).map((skill) => ({
+         ...skill,
+@@ -150,101 +155,105 @@ export class AppComponent implements OnInit, AfterViewInit {
+     const container = document.getElementById('cy');
+     if (!container) {
+       console.error('cy container not found');
+       return;
+     }
+ 
+     console.log('cy container size', container.clientWidth, container.clientHeight);
+ 
+     this.cy = cytoscape({
+       container,
+       elements: [],
+       style: [
+         // Main node style (shows skill name)
+         {
+           selector: 'node:not(.level-node)',
+           style: {
+             'background-color': 'data(color)',
+             'shape': 'round-rectangle',
+             'color': '#000',
+             'label': 'data(label)',
+             // put label slightly below the node center - now configurable
+             'text-valign': this.mainLabelConfig.textValign,
+             'text-margin-y': this.mainLabelConfig.textMarginY,
+             'text-halign': this.mainLabelConfig.textHalign,
+             'text-wrap': 'wrap',
+-            'text-max-width': '120px',
++            'text-max-width': `${this.nodeSize.labelMaxWidth}px`,
+             'font-size': '14px',
+-            'width': 'mapData(level, 1, 5, 80, 160)',
+-            'height': 'mapData(level, 1, 5, 56, 96)'
++            'width': `${this.nodeSize.width}px`,
++            'height': `${this.nodeSize.height}px`
+           }
+         },
+         // Level node style (small/italic/monospace inside parent)
+         {
+           selector: 'node.level-node',
+           style: {
+             'label': 'data(label)',
+-            'font-size': '11px',
+-            'font-style': 'italic',
+-            'font-family': 'Courier New, monospace',
++            'font-size': '12px',
++            'font-weight': 700,
++            'font-style': 'normal',
++            'font-family': 'Inter, "Segoe UI", Arial, sans-serif',
+             'color': '#333',
+-            'text-valign': 'bottom',
+-            'text-margin-y': -4,
++            'text-valign': 'center',
++            'text-halign': 'center',
++            'text-margin-y': 0,
+             'background-opacity': 0,
+             'border-width': 0,
+             'width': '80px',
+             'height': '14px'
+           }
+         },
+         {
+           selector: 'edge',
+           style: {
+             'curve-style': 'bezier',
+             'width': 2,
+             'line-color': '#999',
+             'target-arrow-shape': 'triangle',
+             'target-arrow-color': '#999'
+           }
+         },
+         // searched/highlight/faded styles
+         {
+           selector: 'node.searched',
+           style: {
+             'border-width': 3,
+             'border-color': '#FFD54F',
+             'background-color': '#fff',
+-            'width': 'mapData(level, 1, 5, 90, 180)'
++            'width': `${this.nodeSize.width}px`,
++            'height': `${this.nodeSize.height}px`
+           }
+         },
+         {
+           // only apply highlight sizing to main nodes (exclude level nodes)
+           selector: 'node.selected',
+           style: {
+             'border-width': 4,
+             'border-color': '#FF5A5F',
+             'background-color': '#ffffff',
+-            'width': 'mapData(level, 1, 5, 100, 200)'
++            'width': `${this.nodeSize.width}px`,
++            'height': `${this.nodeSize.height}px`
+           }
+         },
+         {
+           selector: 'node.faded',
+           style: {
+             'opacity': 0.1,
+             'text-opacity': 0.2
+           }
+         },
+         {
+           selector: 'edge.faded',
+           style: {
+             'opacity': 0.05
+           }
+         },
+       ],
+       // Use centralized options
+       layout: (this.getLayoutOptions(this.layoutName) as any)
+     });
+ 
+     // Ensure we perform a resize/fit after layout stops, which is more reliable
+     this.cy.on('layoutstop', () => {
+       console.log('layoutstop:', {
+         nodes: this.cy.nodes().length,
+         containerWidth: container.clientWidth,
+@@ -425,51 +434,51 @@ export class AppComponent implements OnInit, AfterViewInit {
+           // prevent user dragging the level node directly
+           if ((lvl as any).ungrabify) (lvl as any).ungrabify();
+           // adjust size to fit inside the parent
+           const lvlWidth = Math.max(Math.min(bbox.w * 0.5, this.levelNodeConfig.maxWidth), this.levelNodeConfig.minWidth);
+           lvl.style('width', lvlWidth);
+           lvl.style('height', lvlHeight);
+           lvl.style('z-index', 999);
+           lvl.position({ x, y });
+         } catch {
+           // ignore positioning errors in some environments
+         }
+       }
+     });
+   }
+ 
+   addElementsToCytoscape(elements: any[]) {
+     if (!this.cy) {
+       console.warn('Cytoscape not initialized yet, skipping addElements');
+       return;
+     }
+ 
+     // Defensive: if no elements, create a debug node so we can verify Cytoscape renders
+     if (!elements || elements.length === 0) {
+       elements = [
+         { data: { id: 'skill-1', label: 'Demo Node', category: 'Backend', level: 2 } },
+-        { data: { id: 'skill-1-level', label: 'Lv.2', level: 2, attachedTo: 'skill-1' }, classes: 'level-node' }
++        { data: { id: 'skill-1-level', label: this.levelToStars(2), level: 2, attachedTo: 'skill-1' }, classes: 'level-node' }
+       ];
+       console.warn('No elements provided; adding a demo node for debugging.');
+     }
+ 
+     console.log('adding elements to cy:', elements.length, 'container size', (document.getElementById('cy')?.clientWidth), (document.getElementById('cy')?.clientHeight));
+     this.cy.startBatch();
+     try {
+       this.cy.elements().remove();
+       this.cy.add(elements);
+ 
+       this.syncEditingModeInteractions();
+ 
+       // make level nodes ungrabify (prevent direct dragging) and unselectify (prevent direct selection)
+       this.cy.nodes('.level-node').forEach((lvl: any) => {
+         try {
+           if ((lvl as any).ungrabify) (lvl as any).ungrabify();
+           if ((lvl as any).unselectify) (lvl as any).unselectify();
+         } catch {
+           // ignore
+         }
+       });
+ 
+       // run layout only on non-level elements so level nodes are not rearranged by layout
+       const layout = this.cy.elements(':not(.level-node)').layout((this.getLayoutOptions(this.layoutName) as any));
+       layout.run();
+@@ -479,55 +488,51 @@ export class AppComponent implements OnInit, AfterViewInit {
+       // fallback: ensure resize/fit after a small delay in case layoutstop isn't triggered or complete
+       setTimeout(() => {
+         requestAnimationFrame(() => {
+           if (this.cy) {
+             try {
+               this.cy.resize();
+               this.fit();
+               this.cy.center();
+               // fallback positioning too
+               this.positionLevelNodes();
+             } catch (e) {
+               // ignore
+             }
+           }
+         });
+       }, 100);
+     } finally {
+       this.cy.endBatch();
+     }
+   }
+ 
+   private syncEditingModeInteractions() {
+     if (!this.cy) return;
+ 
+     const mainNodes = this.cy.nodes(':not(.level-node)');
+-    if (this.editingMode) {
+-      if ((mainNodes as any).grabify) (mainNodes as any).grabify();
+-    } else {
+-      if ((mainNodes as any).ungrabify) (mainNodes as any).ungrabify();
+-    }
++    if ((mainNodes as any).grabify) (mainNodes as any).grabify();
+   }
+ 
+   levelToStars(level: number | string | null | undefined) {
+     const l = Math.max(0, Math.min(5, Number(level) || 0));
+     return l === 0 ? '☆' : '★'.repeat(l);
+   }
+ 
+   // Toolbar actions
+   fit() {
+     if (!this.cy) return;
+ 
+     const visibleMainNodes = this.cy.nodes(':not(.level-node):visible');
+     const totalCategories = this.categoryOptions.length;
+     const hasCategoryFilter = totalCategories > 0 && this.selectedCategories.size > 0 && this.selectedCategories.size < totalCategories;
+ 
+     if (hasCategoryFilter) {
+       const categoryNodes = visibleMainNodes.filter((n: any) => this.selectedCategories.has(n.data('category')));
+       if (categoryNodes.length > 0) {
+         const attachedLevelNodes = this.cy.collection();
+         categoryNodes.forEach((n: any) => {
+           attachedLevelNodes.merge(this.cy.nodes(`.level-node[attachedTo = "${n.id()}"]`));
+         });
+ 
+         const targets = categoryNodes.union(attachedLevelNodes);
+         this.cy.fit(targets, 20);
+diff --git a/techtree-frontend/src/app/features/graph/services/graph-data.service.ts b/techtree-frontend/src/app/features/graph/services/graph-data.service.ts
+index aad425370e65ada37ceceb381064687fff99aeac..fcc542fba27b4405139b4decebf992272a450507 100644
+--- a/techtree-frontend/src/app/features/graph/services/graph-data.service.ts
++++ b/techtree-frontend/src/app/features/graph/services/graph-data.service.ts
+@@ -15,62 +15,77 @@ export class GraphDataService {
+ 
+     skills.forEach((skill) => {
+       if (!categoryColors[skill.category]) {
+         categoryColors[skill.category] = this.generateRandomColor();
+       }
+     });
+ 
+     const categoryList: CategoryColor[] = Object.entries(categoryColors).map(([name, color], idx) => ({
+       id: idx + 1,
+       name,
+       color
+     }));
+ 
+     const nodeElements: ElementDefinition[] = skills.map((skill) => ({
+       data: {
+         id: `skill-${skill.id}`,
+         label: skill.name,
+         category: skill.category,
+         color: categoryColors[skill.category] ?? '#d1d5db',
+         level: skill.level,
+         description: skill.description,
+         user_comment: skill.user_comment
+       }
+     }));
+ 
++    const levelNodes: ElementDefinition[] = skills.map((skill) => ({
++      data: {
++        id: `skill-${skill.id}-level`,
++        label: this.levelToStars(skill.level),
++        level: skill.level,
++        attachedTo: `skill-${skill.id}`
++      },
++      classes: 'level-node'
++    }));
++
+     const edgeElements: ElementDefinition[] = relations
+       .map((relation) => {
+         const from = relation.from_node_id ?? relation.from_node?.id;
+         const to = relation.to_node_id ?? relation.to_node?.id;
+         if (from == null || to == null) return null;
+         return {
+           data: {
+             id: `relation-${relation.id}`,
+             source: `skill-${from}`,
+             target: `skill-${to}`,
+             relation_type: relation.relation_type,
+             strength: relation.strength
+           }
+         } as ElementDefinition;
+       })
+       .filter((el): el is ElementDefinition => Boolean(el));
+ 
+     return {
+-      elements: [...nodeElements, ...edgeElements],
++      elements: [...nodeElements, ...levelNodes, ...edgeElements],
+       categoryColors,
+       categoryList
+     };
+   }
+ 
+   ensureCategoryColor(categoryColors: Record<string, string>, category: string): string {
+     if (!category) return '#d1d5db';
+     if (!categoryColors[category]) {
+       categoryColors[category] = this.generateRandomColor();
+     }
+     return categoryColors[category];
+   }
+ 
+   private generateRandomColor() {
+     const component = () => Math.floor(Math.random() * 156 + 80).toString(16).padStart(2, '0');
+     return `#${component()}${component()}${component()}`;
+   }
++
++  private levelToStars(level: number | string | null | undefined) {
++    const l = Math.max(0, Math.min(5, Number(level) || 0));
++    return l === 0 ? '☆' : '★'.repeat(l);
++  }
+ }
+diff --git a/techtree-frontend/src/app/features/node-selection/node-selection.component.css b/techtree-frontend/src/app/features/node-selection/node-selection.component.css
+index 340d9625f9836037b22b8f8c8a9f40fa6d3e449d..7e063c510a3241a1bab9ef89645144369765e8d5 100644
+--- a/techtree-frontend/src/app/features/node-selection/node-selection.component.css
++++ b/techtree-frontend/src/app/features/node-selection/node-selection.component.css
+@@ -213,50 +213,56 @@
+ }
+ 
+ .card-header-row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   flex-wrap: wrap;
+ }
+ 
+ .card-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+   gap: 12px;
+ }
+ 
+ .card {
+   border: 1px solid #e2e8f0;
+   border-radius: 12px;
+   background: linear-gradient(180deg, #fff, #f8fafc);
+   padding: 14px;
+   display: flex;
+   flex-direction: column;
+   gap: 8px;
+   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
++  cursor: grab;
++  user-select: none;
++}
++
++.card:active {
++  cursor: grabbing;
+ }
+ 
+ .card-top {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 8px;
+ }
+ 
+ .card-category {
+   margin: 0;
+   color: #475569;
+   font-weight: 600;
+   font-size: 13px;
+ }
+ 
+ .card-title {
+   margin: 2px 0 0;
+   font-size: 18px;
+ }
+ 
+ .level-pill {
+   background: #dbeafe;
+   color: #1d4ed8;
+   padding: 4px 10px;
+diff --git a/techtree-frontend/src/app/features/node-selection/node-selection.component.html b/techtree-frontend/src/app/features/node-selection/node-selection.component.html
+index 624fe72bead55adf75c52a44af36b2a9706347e6..76a5ca1dae08fcbec69f579cf1718a27e7f1e2d1 100644
+--- a/techtree-frontend/src/app/features/node-selection/node-selection.component.html
++++ b/techtree-frontend/src/app/features/node-selection/node-selection.component.html
+@@ -1,30 +1,30 @@
+ <div class="selection-page">
+   <header class="selection-header">
+     <div>
+       <p class="eyebrow">カードエクスポート</p>
+-      <h1>Lv1以上のノードを選択</h1>
++      <h1>ノードを選択</h1>
+       <p class="hint">最大{{ maxSelectable }}件まで選択してカード形式で出力できます。</p>
+     </div>
+     <div class="header-actions">
+       <a routerLink="/" class="btn ghost">ツリーに戻る</a>
+       <button class="btn primary" (click)="downloadCardsPng()" [disabled]="selectedSkills.length === 0 || exporting">
+         {{ exporting ? '書き出し中...' : 'カードをPNG保存' }}
+       </button>
+     </div>
+   </header>
+ 
+   <section class="selectors">
+     <div class="toolbar">
+       <div class="input-group">
+         <label for="search">検索</label>
+         <input
+           id="search"
+           type="text"
+           [value]="searchTerm"
+           (input)="applySearch($any($event.target).value)"
+           placeholder="名前またはカテゴリ"
+         />
+       </div>
+       <div class="counts">
+         <span>選択可能: {{ filteredSkills.length }}件</span>
+         <span>選択中: {{ selectedSkills.length }} / {{ maxSelectable }}</span>
+@@ -43,39 +43,48 @@
+           <div class="option-title">{{ displayName(skill) }}</div>
+           <div class="option-meta">
+             <span class="badge">Lv{{ skill.level }}</span>
+             <span class="badge light">{{ skill.category }}</span>
+           </div>
+           <p class="option-desc">{{ skill.description || '説明が登録されていません。' }}</p>
+         </div>
+       </label>
+     </div>
+   </section>
+ 
+   <section class="card-preview">
+     <div class="card-header-row">
+       <h2>選択したノード ({{ selectedSkills.length }}件)</h2>
+       <div class="card-actions">
+         <button class="btn" (click)="backToGraph()">ツリーを表示</button>
+         <button class="btn primary" (click)="downloadCardsPng()" [disabled]="selectedSkills.length === 0 || exporting">
+           {{ exporting ? '書き出し中...' : 'カードPNGを出力' }}
+         </button>
+       </div>
+     </div>
+     <div class="status" *ngIf="selectedSkills.length === 0">
+       ノードを選択するとここにカードが表示されます。
+     </div>
+     <div #cardList class="card-grid" *ngIf="selectedSkills.length > 0">
+-      <article class="card" *ngFor="let skill of selectedSkills">
++      <article
++        class="card"
++        *ngFor="let skill of selectedSkills"
++        draggable="true"
++        (dragstart)="onCardDragStart(skill.id)"
++        (dragenter)="onCardDragEnter(skill.id)"
++        (dragover)="onCardDragOver($event)"
++        (drop)="onCardDrop($event, skill.id)"
++        (dragend)="onCardDragEnd()"
++      >
+         <div class="card-top">
+           <div>
+             <p class="card-category">{{ skill.category }}</p>
+             <h3 class="card-title">{{ displayName(skill) }}</h3>
+           </div>
+           <span class="level-pill">Lv{{ skill.level }}</span>
+         </div>
+         <p class="card-desc">{{ skill.description || '説明が登録されていません。' }}</p>
+       </article>
+     </div>
+     <div class="status error" *ngIf="exportError">{{ exportError }}</div>
+   </section>
+ </div>
+diff --git a/techtree-frontend/src/app/features/node-selection/node-selection.component.ts b/techtree-frontend/src/app/features/node-selection/node-selection.component.ts
+index 338ce3cb8edcd2bc77426bbf48ad3c986e525785..d054cbfd4708adbf3ae035323aa4afb16b075a75 100644
+--- a/techtree-frontend/src/app/features/node-selection/node-selection.component.ts
++++ b/techtree-frontend/src/app/features/node-selection/node-selection.component.ts
+@@ -1,125 +1,139 @@
+ import { CommonModule } from '@angular/common';
+ import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+ import { FormsModule } from '@angular/forms';
+ import { Router, RouterLink } from '@angular/router';
+ import { TechTreeApiService } from '../../core/services/api/tech-tree-api.service';
+ import { Skill } from '../../core/models/skill.model';
+ 
+ @Component({
+   selector: 'app-node-selection',
+   standalone: true,
+   imports: [CommonModule, FormsModule, RouterLink],
+   templateUrl: './node-selection.component.html',
+   styleUrls: ['./node-selection.component.css']
+ })
+ export class NodeSelectionComponent implements OnInit {
+   @ViewChild('cardList') cardList?: ElementRef<HTMLDivElement>;
+ 
+   skills: Skill[] = [];
+   filteredSkills: Skill[] = [];
+   selectedSkillIds = new Set<number>();
++  selectedSkillOrder: number[] = [];
++  draggingCardId: number | null = null;
+   loading = false;
+   error = '';
+   selectionError = '';
+   exportError = '';
+   searchTerm = '';
+   readonly maxSelectable = 12;
+   exporting = false;
+ 
+   constructor(private apiService: TechTreeApiService, private router: Router) { }
+ 
+   ngOnInit() {
+     this.loadSkills();
+   }
+ 
+   async loadSkills() {
+     this.loading = true;
+     this.error = '';
+     try {
+       const skills = await this.apiService.fetchSkills();
+       this.skills = (skills ?? [])
+         .map((skill) => ({ ...skill, level: skill.level ?? 0 }))
+-        .filter((skill) => (skill.level ?? 0) >= 1)
+         .sort((a, b) => {
+           if (b.level === a.level) {
+             return (a.name ?? a.label ?? '').localeCompare(b.name ?? b.label ?? '');
+           }
+           return (b.level ?? 0) - (a.level ?? 0);
+         });
+       this.filteredSkills = [...this.skills];
++      this.reconcileSelectedOrder();
+     } catch (err) {
+       console.error('Failed to load skills', err);
+       this.error = 'ノードの取得に失敗しました。時間をおいて再度お試しください。';
+     } finally {
+       this.loading = false;
+     }
+   }
+ 
+   get selectedSkills(): Skill[] {
+-    return this.skills.filter((skill) => this.selectedSkillIds.has(skill.id));
++    const skillMap = new Map(this.skills.map((skill) => [skill.id, skill]));
++    const ordered = this.selectedSkillOrder
++      .map((id) => skillMap.get(id))
++      .filter((skill): skill is Skill => Boolean(skill));
++    const missing = this.skills.filter(
++      (skill) => this.selectedSkillIds.has(skill.id) && !this.selectedSkillOrder.includes(skill.id)
++    );
++    return [...ordered, ...missing];
+   }
+ 
+   displayName(skill: Skill) {
+     return skill.name ?? skill.label ?? 'No name';
+   }
+ 
+   isSelected(skill: Skill) {
+     return this.selectedSkillIds.has(skill.id);
+   }
+ 
+   toggleSelection(skill: Skill) {
+     this.selectionError = '';
+     if (this.selectedSkillIds.has(skill.id)) {
+       this.selectedSkillIds.delete(skill.id);
++      this.selectedSkillOrder = this.selectedSkillOrder.filter((id) => id !== skill.id);
+       return;
+     }
+ 
+     if (this.selectedSkillIds.size >= this.maxSelectable) {
+       this.selectionError = `最大${this.maxSelectable}件まで選択できます。`;
+       return;
+     }
+ 
+     this.selectedSkillIds.add(skill.id);
++    if (!this.selectedSkillOrder.includes(skill.id)) {
++      this.selectedSkillOrder = [...this.selectedSkillOrder, skill.id];
++    }
+   }
+ 
+   applySearch(term: string) {
+     this.searchTerm = term;
+     const keyword = term.trim().toLowerCase();
+     if (!keyword) {
+       this.filteredSkills = [...this.skills];
+       return;
+     }
+ 
+     this.filteredSkills = this.skills.filter((skill) => {
+       const target = `${this.displayName(skill)} ${skill.category ?? ''}`.toLowerCase();
+       return target.includes(keyword);
+     });
+   }
+ 
+   clearSelection() {
+     this.selectedSkillIds.clear();
++    this.selectedSkillOrder = [];
+     this.selectionError = '';
+   }
+ 
+   backToGraph() {
+     this.router.navigate(['/']);
+   }
+ 
+   async downloadCardsPng() {
+     if (!this.cardList || this.selectedSkillIds.size === 0) return;
+ 
+     this.exporting = true;
+     this.exportError = '';
+     try {
+       const dataUrl = await this.buildCardsPng(this.cardList.nativeElement);
+       const link = document.createElement('a');
+       link.href = dataUrl;
+       link.download = 'selected-nodes.png';
+       link.click();
+     } catch (err) {
+       console.error('Failed to export cards', err);
+       this.exportError = 'カード一覧のPNG出力に失敗しました。';
+     } finally {
+       this.exporting = false;
+     }
+   }
+@@ -172,26 +186,68 @@ export class NodeSelectionComponent implements OnInit {
+       img.onload = () => {
+         const canvas = document.createElement('canvas');
+         canvas.width = width;
+         canvas.height = height;
+         const ctx = canvas.getContext('2d');
+         if (!ctx) {
+           reject(new Error('Canvas is not supported'));
+           return;
+         }
+         ctx.fillStyle = '#f8fafc';
+         ctx.fillRect(0, 0, width, height);
+         ctx.drawImage(img, 0, 0);
+         resolve(canvas.toDataURL('image/png'));
+       };
+       img.onerror = (err) => reject(err);
+       img.src = dataUrl;
+     });
+   }
+ 
+   private async buildCardsPng(element: HTMLElement) {
+     const width = Math.ceil(element.scrollWidth || element.offsetWidth || 800);
+     const height = Math.ceil(element.scrollHeight || element.offsetHeight || 600);
+     const svgDataUrl = this.buildSvgDataUrl(element, width, height);
+     return this.svgToPng(svgDataUrl, width, height);
+   }
++
++  private reconcileSelectedOrder() {
++    const availableIds = new Set(this.skills.map((s) => s.id));
++    this.selectedSkillOrder = this.selectedSkillOrder.filter(
++      (id) => availableIds.has(id) && this.selectedSkillIds.has(id)
++    );
++    this.selectedSkillIds = new Set(this.selectedSkillOrder);
++  }
++
++  onCardDragStart(skillId: number) {
++    this.draggingCardId = skillId;
++  }
++
++  onCardDragEnter(targetId: number) {
++    if (this.draggingCardId == null || this.draggingCardId === targetId) return;
++    this.reorderSelectedSkills(this.draggingCardId, targetId);
++  }
++
++  onCardDragOver(event: DragEvent) {
++    event.preventDefault();
++  }
++
++  onCardDrop(event: DragEvent, targetId: number) {
++    event.preventDefault();
++    this.onCardDragEnter(targetId);
++    this.draggingCardId = null;
++  }
++
++  onCardDragEnd() {
++    this.draggingCardId = null;
++  }
++
++  private reorderSelectedSkills(sourceId: number, targetId: number) {
++    const order = [...this.selectedSkillOrder];
++    const fromIndex = order.indexOf(sourceId);
++    const toIndex = order.indexOf(targetId);
++    if (fromIndex === -1 || toIndex === -1) return;
++
++    order.splice(fromIndex, 1);
++    order.splice(toIndex, 0, sourceId);
++    this.selectedSkillOrder = order;
++  }
+ }
+ 
+EOF
+)

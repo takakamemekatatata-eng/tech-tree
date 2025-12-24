@@ -93,6 +93,7 @@ app-graph-view {
   border-radius: 6px;
   cursor: pointer;
   transition: transform 120ms ease, box-shadow 120ms ease;
+  color: #111827;
 }
 
 .btn:hover {
@@ -201,6 +202,8 @@ app-graph-view {
    ========================= */
 .details {
   width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  max-width: var(--sidebar-width);
   flex-shrink: 0;
   padding: 12px;
   border-right: 1px solid #e9ecef;
@@ -433,6 +436,8 @@ app-graph-view {
   line-height: 1.6;
   color: #333;
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .details textarea {

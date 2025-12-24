@@ -2,7 +2,7 @@
   <header class="selection-header">
     <div>
       <p class="eyebrow">カードエクスポート</p>
-      <h1>Lv1以上のノードを選択</h1>
+      <h1>ノードを選択</h1>
       <p class="hint">最大{{ maxSelectable }}件まで選択してカード形式で出力できます。</p>
     </div>
     <div class="header-actions">
@@ -65,7 +65,16 @@
       ノードを選択するとここにカードが表示されます。
     </div>
     <div #cardList class="card-grid" *ngIf="selectedSkills.length > 0">
-      <article class="card" *ngFor="let skill of selectedSkills">
+      <article
+        class="card"
+        *ngFor="let skill of selectedSkills"
+        draggable="true"
+        (dragstart)="onCardDragStart(skill.id)"
+        (dragenter)="onCardDragEnter(skill.id)"
+        (dragover)="onCardDragOver($event)"
+        (drop)="onCardDrop($event, skill.id)"
+        (dragend)="onCardDragEnd()"
+      >
         <div class="card-top">
           <div>
             <p class="card-category">{{ skill.category }}</p>
