@@ -3,9 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
-import axios from 'axios';
 import { layoutConfig, levelNodeConfig, mainLabelConfig } from './visual-config';
-import { environment } from '../environments/environment';
+import { TechTreeApiService } from './core/services/api/tech-tree-api.service';
+import { Skill } from './core/models/skill.model';
+import { Relation } from './core/models/relation.model';
+import { CategoryColor } from './core/models/category-color.model';
+import { GraphDataService } from './features/graph/services/graph-data.service';
 
 cytoscape.use(dagre);
 
@@ -27,7 +30,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   levelOptions: number[] = [];
   categoryOptions: string[] = [];
   categoryColors: Record<string, string> = {};
-  categoryList: { id: number; name: string; color: string }[] = [];
+  categoryList: CategoryColor[] = [];
   sidebarCollapsed = false;
   layoutName = 'dagre';
   //layoutName = 'breadthfirst';
@@ -36,9 +39,9 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   // table / view state
   viewMode: 'graph' | 'table' = 'graph';
-  skills: any[] = [];
-  relations: any[] = [];
-  filteredTableRows: any[] = [];
+  skills: Skill[] = [];
+  relations: Relation[] = [];
+  filteredTableRows: Skill[] = [];
   sortState: {
     column: 'label' | 'category' | 'level' | 'user_comment' | 'description';
     direction: 'asc' | 'desc';
@@ -91,7 +94,12 @@ export class AppComponent implements OnInit, AfterViewInit {
   readonly mainLabelConfig = mainLabelConfig;
 
   // inject ChangeDetectorRef and NgZone so Cytoscape callbacks can update Angular view
-  constructor(private cdr: ChangeDetectorRef, private ngZone: NgZone) { }
+  constructor(
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone,
+    private apiService: TechTreeApiService,
+    private graphDataService: GraphDataService
+  ) { }
 
   // Helper: return layout options for a layout name
   getLayoutOptions(layoutName?: string) {
@@ -102,17 +110,17 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   async ngOnInit() {
     try {
-      const [nodeRes, relationRes] = await Promise.all([
-        axios.get(`${environment.apiUrl}/nodes/`),
-        axios.get(`${environment.apiUrl}/relations/`)
+      const [skillsResponse, relationResponse] = await Promise.all([
+        this.apiService.fetchSkills(),
+        this.apiService.fetchRelations()
       ]);
-      const skills = (nodeRes.data ?? []).map((n: any) => ({
-        ...n,
-        level: n.level ?? 0,
-        user_comment: n.user_comment ?? '',
+      const skills = (skillsResponse ?? []).map((skill) => ({
+        ...skill,
+        level: skill.level ?? 0,
+        user_comment: skill.user_comment ?? '',
         parent_id: null
       }));
-      this.relations = relationRes.data ?? [];
+      this.relations = relationResponse ?? [];
       console.log('nodes fetched', skills?.length, 'relations fetched', this.relations?.length);
 
       this.skills = skills ?? [];
@@ -822,10 +830,7 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   private async ensureCategoryColor(name: string) {
     if (!name) return '#d1d5db';
-    if (this.categoryColors[name]) return this.categoryColors[name];
-
-    const color = this.generateRandomColor();
-    this.categoryColors[name] = color;
+    const color = this.graphDataService.ensureCategoryColor(this.categoryColors, name);
     this.categoryOptions = Array.from(new Set([...this.categoryOptions, name])).sort();
     this.selectedCategories.add(name);
 
@@ -838,58 +843,11 @@ export class AppComponent implements OnInit, AfterViewInit {
     return color;
   }
 
-  private generateRandomColor() {
-    const component = () => Math.floor(Math.random() * 156 + 80).toString(16).padStart(2, '0');
-    return `#${component()}${component()}${component()}`;
-  }
-
   private rebuildElementsFromSkills() {
-    // refresh categories/colors from current nodes
-    const previousColors = { ...this.categoryColors };
-    this.categoryColors = {};
-    (this.skills ?? []).forEach((s: any) => {
-      if (!this.categoryColors[s.category]) {
-        this.categoryColors[s.category] = previousColors[s.category] ?? this.generateRandomColor();
-      }
-    });
-    this.categoryList = Object.entries(this.categoryColors).map(([name, color], idx) => ({
-      id: idx + 1,
-      name,
-      color
-    }));
-
-    const nodeElements = (this.skills ?? []).map((s: any) => ({
-      data: {
-        id: `skill-${s.id}`,
-        label: s.name,
-        category: s.category,
-        color: this.categoryColors[s.category] ?? '#d1d5db',
-        level: s.level,
-        description: s.description,
-        user_comment: s.user_comment,
-        tags: s.tags ?? []
-      }
-    }));
-
-    const edgeElements = (this.relations ?? [])
-      .map((r: any) => {
-        const from = r.from_node_id ?? r.from_node?.id;
-        const to = r.to_node_id ?? r.to_node?.id;
-        if (from == null || to == null) return null;
-        return {
-          data: {
-            id: `relation-${r.id}`,
-            source: `skill-${from}`,
-            target: `skill-${to}`,
-            relation_type: r.relation_type,
-            strength: r.strength,
-            context: r.context
-          }
-        };
-      })
-      .filter((el): el is { data: any } => !!el);
-
-    this.elements = [...nodeElements, ...edgeElements];
+    const graphState = this.graphDataService.buildGraphState(this.skills ?? [], this.relations ?? [], this.categoryColors);
+    this.categoryColors = graphState.categoryColors;
+    this.categoryList = graphState.categoryList;
+    this.elements = graphState.elements;
 
     this.refreshCategoryOptionsFromState();
     this.refreshLevelOptionsFromSkills();
@@ -916,7 +874,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     return match ? Number(match[1]) : null;
   }
 
-  private async pushSkillToState(skill: any) {
+  private async pushSkillToState(skill: Skill) {
     this.skills.push(skill);
     await this.ensureCategoryColor(skill.category);
     this.rebuildElementsFromSkills();
@@ -929,14 +887,15 @@ export class AppComponent implements OnInit, AfterViewInit {
       relation_type,
       strength
     };
-    const res = await axios.post(`${environment.apiUrl}/relations/`, payload);
-    const created = res.data ?? { ...payload, id: Date.now() };
+    const created = await this.apiService.createRelation(payload);
+    const fallback = { ...payload, id: Date.now() };
+    const normalizedSource = created ?? fallback;
     const normalized = {
-      id: created.id ?? Date.now(),
-      from_node_id: created.from_node_id ?? created.from_node ?? fromId,
-      to_node_id: created.to_node_id ?? created.to_node ?? toId,
-      relation_type: created.relation_type ?? relation_type,
-      strength: created.strength ?? strength
+      id: normalizedSource.id ?? Date.now(),
+      from_node_id: normalizedSource.from_node_id ?? normalizedSource.from_node ?? fromId,
+      to_node_id: normalizedSource.to_node_id ?? normalizedSource.to_node ?? toId,
+      relation_type: normalizedSource.relation_type ?? relation_type,
+      strength: normalizedSource.strength ?? strength
     };
     this.relations = [...this.relations, normalized];
     this.rebuildElementsFromSkills();
@@ -976,8 +935,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     };
 
     await this.ensureCategoryColor(category);
-    const response = await axios.post(`${environment.apiUrl}/nodes/`, payload);
-    const created = response.data;
+    const created = await this.apiService.createSkill(payload);
     created.parent_id = null;
     created.level = this.clampLevelValue(level);
     created.user_comment = '';
@@ -991,7 +949,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     const match = String(this.selectedNode.id ?? '').match(/^skill-(\d+)$/);
     if (!match) return;
     const id = Number(match[1]);
-    await axios.delete(`${environment.apiUrl}/nodes/${id}/`);
+    await this.apiService.deleteSkill(id);
     this.elements = this.elements.filter((el) => {
       return !(
         (el.data?.id && String(el.data.id) === `skill-${id}`) ||
@@ -1018,7 +976,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     const match = String(this.selectedNode.id ?? '').match(/^skill-(\d+)$/);
     if (!match) return;
     const id = Number(match[1]);
-    await axios.patch(`${environment.apiUrl}/nodes/${id}/`, { description: this.selectedNode.description ?? '' });
+    await this.apiService.updateSkill(id, { description: this.selectedNode.description ?? '' });
     const target = this.skills.find((s: any) => Number(s.id) === id);
     if (target) target.description = this.selectedNode.description;
     this.refreshTableRows();
@@ -1058,7 +1016,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
 
     await this.ensureCategoryColor(category);
-    await axios.patch(`${environment.apiUrl}/nodes/${skillId}/`, payload);
+    await this.apiService.updateSkill(skillId, payload);
 
     const target = (this.skills ?? []).find((s: any) => Number(s.id) === skillId);
     if (target) {
@@ -1183,7 +1141,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
 
     try {
-      await axios.patch(`${environment.apiUrl}/relations/${this.selectedConnectionId}/`, {
+      await this.apiService.updateRelation(this.selectedConnectionId, {
         from_node_id: fromId,
         to_node_id: toId,
         relation_type: relationType,
@@ -1211,7 +1169,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     const baseId = this.getSelectedSkillId();
 
     try {
-      await axios.delete(`${environment.apiUrl}/relations/${relationId}/`);
+      await this.apiService.deleteRelation(relationId);
       this.relations = (this.relations ?? []).filter((r: any) => Number(r.id) !== Number(relationId));
       this.rebuildElementsFromSkills();
       this.refreshSelectedConnections();
@@ -1680,7 +1638,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     if (payload.tags !== undefined) allowedPayload.tags = payload.tags;
 
     if (Object.keys(allowedPayload).length > 0) {
-      await axios.patch(`${environment.apiUrl}/nodes/${skillId}/`, allowedPayload);
+      await this.apiService.updateSkill(skillId, allowedPayload);
     }
 
     this.applySkillChanges(skillId, payload);

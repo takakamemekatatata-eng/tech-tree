@@ -21,10 +21,13 @@ TechTree は技術ノード間の関係（ノード + エッジ）を可視化�
 ## 主要ファイル・設定箇所
 - フロントエンド
   - src/app/app.ts — Cytoscape 初期化、イベント、レイアウト操作
+  - src/app/core/services/api/tech-tree-api.service.ts — ノード/リレーションの API 呼び出しを集約
+  - src/app/features/graph/services/graph-data.service.ts — ノード/リレーションを Cytoscape 要素へ変換し、カテゴリ色を管理
   - src/app/visual-config.ts — 表示に関する集中設定（layoutConfig, levelNodeConfig, mainLabelConfig）
   - src/app/style-variables.css — グローバル CSS 変数
   - src/app/app.css / src/styles.css — UI スタイル
   - src/app/app.html — ヘッダー・検索・サイドバー・cy コンテナ（#cy）
+  - docs/FRONTEND_ARCHITECTURE.md — フロントエンドのフォルダ構成と移行方針メモ
 - バックエンド
   - skills アプリ: skills/models.py（Node / Relation モデルと API）
   - backend/settings.py — DB / CORS / INSTALLED_APPS 等
