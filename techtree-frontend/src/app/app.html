@@ -124,8 +124,8 @@
         <h3>編集モードの使い方</h3>
         <ol class="edit-steps">
           <li><strong>ノードをクリック</strong>して詳細を開きます。位置はドラッグで調整できます（表示のみ）。</li>
-          <li>新しいノードを作る場合は「ノード追加」で必要に応じて <strong>親ノード名</strong> を入力して保存します。</li>
-          <li>選択中ノードは説明を上書き保存できます。不要なら「ノードを削除」を押してください。</li>
+          <li>「ノード追加」で名称・カテゴリ・レベルを入力して保存します。接続は後述の接続管理で行います。</li>
+          <li>選択中ノードではカテゴリ/説明編集に加えて、<strong>接続の追加・編集・削除</strong> が行えます。</li>
           <li>カテゴリ名と色を入力して「カテゴリ色を保存」を押すと、グラフ全体に即時反映されます。</li>
         </ol>
       </div>
@@ -142,16 +142,6 @@
         <div class="form-row">
           <label>レベル(0-5)</label>
           <input type="number" min="0" max="5" [(ngModel)]="newSkill.level" />
-        </div>
-        <div class="form-row">
-          <label>親ノード(任意)</label>
-          <input
-            type="text"
-            [(ngModel)]="newSkill.parentName"
-            placeholder="親ノード名"
-            list="skill-name-options-list"
-          />
-          <small class="hint">入力すると候補が表示されます。未入力の場合は親なしで作成します。</small>
         </div>
         <div class="form-row">
           <label>説明</label>
@@ -175,17 +165,7 @@
               list="category-options-list"
             />
           </div>
-          <div class="form-row">
-            <label>親ノード(任意)</label>
-            <input
-              type="text"
-              [(ngModel)]="selectedParentName"
-              placeholder="親ノード名"
-              list="skill-name-options-list"
-            />
-            <small class="hint">入力すると候補が表示されます。</small>
-          </div>
-          <button class="btn primary" (click)="saveSelectedMetadata()">カテゴリ/親を保存</button>
+          <button class="btn primary" (click)="saveSelectedMetadata()">カテゴリを保存</button>
           <div class="form-message" [class.error]="metadataSaveIsError" *ngIf="metadataSaveMessage">
             {{ metadataSaveMessage }}
           </div>
@@ -195,6 +175,68 @@
           </div>
           <button class="btn primary" (click)="saveDescription()">説明を保存</button>
           <button class="btn danger" (click)="deleteSelectedSkill()">ノードを削除</button>
+        </div>
+      </div>
+
+      <div class="editor-card">
+        <h3>接続管理</h3>
+        <p class="hint" *ngIf="!selectedNode">ノードを選択してください。</p>
+        <div *ngIf="selectedNode">
+          <p class="hint">既存の接続をクリックすると設定がフォームに読み込まれ、上書き保存できます。</p>
+          <div class="form-row inline">
+            <label>接続方向</label>
+            <div class="radio-row">
+              <label><input type="radio" [(ngModel)]="connectionForm.direction" value="outgoing" /> このノード → 接続先</label>
+              <label><input type="radio" [(ngModel)]="connectionForm.direction" value="incoming" /> 接続先 → このノード</label>
+            </div>
+          </div>
+          <div class="form-row">
+            <label>接続先ノード</label>
+            <input
+              type="text"
+              [(ngModel)]="connectionForm.targetName"
+              placeholder="ノード名"
+              list="skill-name-options-list"
+            />
+          </div>
+          <div class="form-row">
+            <label>接続タイプ</label>
+            <select [(ngModel)]="connectionForm.relationType">
+              <option *ngFor="let t of relationTypeOptions" [value]="t">{{ t }}</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>強さ(0-1)</label>
+            <input type="number" min="0" max="1" step="0.1" [(ngModel)]="connectionForm.strength" />
+          </div>
+          <div class="form-message error" *ngIf="connectionError">{{ connectionError }}</div>
+          <div class="form-message success" *ngIf="connectionNotice">{{ connectionNotice }}</div>
+          <div class="connection-actions">
+            <button class="btn primary" (click)="selectedConnectionId ? updateConnection() : addConnection()">
+              {{ selectedConnectionId ? '接続を更新' : '接続を追加' }}
+            </button>
+            <button class="btn" type="button" (click)="resetConnectionSelection()">選択解除</button>
+          </div>
+
+          <div class="connection-list" *ngIf="selectedConnections.length > 0">
+            <div
+              class="connection-row"
+              *ngFor="let rel of selectedConnections"
+              [class.selected]="rel.id === selectedConnectionId"
+              (click)="selectConnection(rel)"
+            >
+              <div class="connection-text">
+                <span class="direction-tag" [class.incoming]="rel.direction === 'incoming'">
+                  {{ rel.direction === 'outgoing' ? 'このノード → ' : 'このノード ← ' }}
+                </span>
+                <strong>{{ rel.targetName || '名称未設定' }}</strong>
+                <span class="relation-chip">{{ rel.relation_type }}</span>
+                <span class="strength-chip">強さ: {{ rel.strength }}</span>
+              </div>
+              <button class="btn small danger" (click)="$event.stopPropagation(); removeConnection(rel.id)">削除</button>
+            </div>
+          </div>
+          <p class="hint" *ngIf="selectedConnections.length === 0">まだ接続はありません。上のフォームから追加できます。</p>
         </div>
       </div>
 

@@ -453,3 +453,78 @@ app-root {
 .save-message.error {
   color: #e03131;
 }
+
+.radio-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.form-row.inline {
+  gap: 6px;
+}
+
+.connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.connection-row.selected {
+  border-color: var(--accent);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+}
+
+.connection-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.direction-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #1d4ed8;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.direction-tag.incoming {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.relation-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+}
+
+.strength-chip {
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.connection-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}

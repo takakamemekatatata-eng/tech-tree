@@ -52,9 +52,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     name: '',
     category: '',
     level: 0,
-    description: '',
-    parent_id: null as number | null,
-    parentName: ''
+    description: ''
   };
   newSkillError = '';
   newSkillNotice = '';
@@ -62,11 +60,27 @@ export class AppComponent implements OnInit, AfterViewInit {
     name: '',
     color: '#4a5568'
   };
-  selectedParentName = '';
   selectedCategoryName = '';
   metadataSaveMessage = '';
   metadataSaveIsError = false;
   skillNameOptions: string[] = [];
+  relationTypeOptions = ['prerequisite', 'used_with', 'alternative', 'related', 'built_on'];
+  selectedConnections: {
+    id: number;
+    direction: 'incoming' | 'outgoing';
+    targetName: string;
+    relation_type: string;
+    strength: number;
+  }[] = [];
+  connectionForm = {
+    targetName: '',
+    relationType: 'prerequisite',
+    direction: 'outgoing' as 'outgoing' | 'incoming',
+    strength: 0.5
+  };
+  connectionError = '';
+  connectionNotice = '';
+  selectedConnectionId: number | null = null;
 
   // --------------------------
   // Centralized layout config
@@ -289,22 +303,27 @@ export class AppComponent implements OnInit, AfterViewInit {
       const node = evt.target;
       const data = node.data();
       // Cytoscape events run outside Angular zone: ensure UI updates happen inside Angular zone
-        this.ngZone.run(() => {
-          this.clearNodeSelection();
-          node.addClass('selected');
-          this.selectedNode = { ...data };
-          this.selectedLevel = Number(data.level ?? 0);
-          this.selectedComment = data.user_comment ?? '';
-          this.editedComment = this.selectedComment;
-          this.selectedCategoryName = data.category ?? '';
-          this.selectedParentName = this.resolveSkillNameById(data.parent_id);
-          this.metadataSaveMessage = '';
-          this.metadataSaveIsError = false;
-          this.saveMessage = '';
-          this.saveError = false;
-          this.sidebarCollapsed = false;
-          this.cdr.detectChanges();
-        });
+      this.ngZone.run(() => {
+        const skillId = this.extractSkillId(data.id);
+        this.clearNodeSelection();
+        node.addClass('selected');
+        this.selectedNode = { ...data };
+        this.selectedLevel = Number(data.level ?? 0);
+        this.selectedComment = data.user_comment ?? '';
+        this.editedComment = this.selectedComment;
+        this.selectedCategoryName = data.category ?? '';
+        this.metadataSaveMessage = '';
+        this.metadataSaveIsError = false;
+        this.saveMessage = '';
+        this.saveError = false;
+        this.sidebarCollapsed = false;
+        this.connectionError = '';
+        this.connectionNotice = '';
+        this.selectedConnectionId = null;
+        this.resetConnectionForm();
+        this.refreshSelectedConnections(skillId ?? undefined);
+        this.cdr.detectChanges();
+      });
     });
 
     // When a level node is tapped, behave as if its parent was tapped
@@ -315,6 +334,7 @@ export class AppComponent implements OnInit, AfterViewInit {
       const parent = this.cy.getElementById(parentId);
       if (parent && parent.length > 0) {
         this.ngZone.run(() => {
+          const skillId = this.extractSkillId(parent.id());
           this.clearNodeSelection();
           parent.addClass('selected');
           this.selectedNode = { ...parent.data() };
@@ -322,12 +342,16 @@ export class AppComponent implements OnInit, AfterViewInit {
           this.selectedComment = parent.data('user_comment') ?? '';
           this.editedComment = this.selectedComment;
           this.selectedCategoryName = parent.data('category') ?? '';
-          this.selectedParentName = this.resolveSkillNameById(parent.data('parent_id'));
           this.metadataSaveMessage = '';
           this.metadataSaveIsError = false;
           this.saveMessage = '';
           this.saveError = false;
           this.sidebarCollapsed = false;
+          this.connectionError = '';
+          this.connectionNotice = '';
+          this.selectedConnectionId = null;
+          this.resetConnectionForm();
+          this.refreshSelectedConnections(skillId ?? undefined);
           this.cdr.detectChanges();
         });
       }
@@ -639,6 +663,46 @@ export class AppComponent implements OnInit, AfterViewInit {
       .sort((a, b) => a.localeCompare(b));
   }
 
+  private findSkillByName(name: string) {
+    const lower = name.toLowerCase();
+    return (this.skills ?? []).find((s: any) => (s?.name ?? s?.label ?? '').toLowerCase() === lower);
+  }
+
+  private getSelectedSkillId(): number | null {
+    const selectedId = String(this.selectedNode?.id ?? this.selectedNode?.['id'] ?? '');
+    const match = selectedId.match(/^skill-(\d+)$/);
+    return match ? Number(match[1]) : null;
+  }
+
+  private resetConnectionForm() {
+    this.connectionForm = {
+      targetName: '',
+      relationType: 'prerequisite',
+      direction: 'outgoing',
+      strength: 0.5
+    };
+  }
+
+  selectConnection(rel: { id: number; direction: 'incoming' | 'outgoing'; targetName: string; relation_type: string; strength: number }) {
+    if (!rel) return;
+    this.selectedConnectionId = rel.id;
+    this.connectionForm = {
+      targetName: rel.targetName ?? '',
+      relationType: rel.relation_type ?? 'prerequisite',
+      direction: rel.direction ?? 'outgoing',
+      strength: Math.max(0, Math.min(1, Number(rel.strength ?? 0.5)))
+    };
+    this.connectionError = '';
+    this.connectionNotice = '';
+  }
+
+  resetConnectionSelection() {
+    this.selectedConnectionId = null;
+    this.resetConnectionForm();
+    this.connectionNotice = '';
+    this.connectionError = '';
+  }
+
   private refreshCategoryOptionsFromState() {
     const categorySet = new Set<string>();
     (this.skills ?? []).forEach((s: any) => {
@@ -708,6 +772,54 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.selectedLevels = nextSelection;
   }
 
+  private refreshSelectedConnections(skillId?: number) {
+    const targetId = skillId ?? this.getSelectedSkillId();
+    if (!targetId) {
+      this.selectedConnections = [];
+      return;
+    }
+
+    const related = (this.relations ?? []).filter(
+      (r: any) =>
+        Number(r.from_node_id ?? r.from_node?.id) === targetId ||
+        Number(r.to_node_id ?? r.to_node?.id) === targetId
+    );
+
+    const mapped = related.map((r: any) => {
+      const fromId = r.from_node_id ?? r.from_node?.id;
+      const toId = r.to_node_id ?? r.to_node?.id;
+      const outgoing = Number(fromId) === targetId;
+      const otherId = outgoing ? toId : fromId;
+      return {
+        id: Number(r.id),
+        direction: outgoing ? 'outgoing' as const : 'incoming' as const,
+        targetName: this.resolveSkillNameById(otherId),
+        relation_type: r.relation_type ?? 'prerequisite',
+        strength: r.strength ?? 0.5
+      };
+    });
+
+    const sorted = mapped.sort((a, b) => a.targetName.localeCompare(b.targetName));
+    const stillSelected = sorted.some((r) => r.id === this.selectedConnectionId);
+
+    this.selectedConnections = sorted;
+
+    if (!stillSelected) {
+      this.selectedConnectionId = null;
+      this.resetConnectionForm();
+    } else if (this.selectedConnectionId) {
+      const selected = sorted.find((r) => r.id === this.selectedConnectionId);
+      if (selected) {
+        this.connectionForm = {
+          targetName: selected.targetName ?? '',
+          relationType: selected.relation_type ?? 'prerequisite',
+          direction: selected.direction ?? 'outgoing',
+          strength: Math.max(0, Math.min(1, Number(selected.strength ?? 0.5)))
+        };
+      }
+    }
+  }
+
   private async ensureCategoryColor(name: string) {
     if (!name) return '#d1d5db';
     if (this.categoryColors[name]) return this.categoryColors[name];
@@ -759,16 +871,23 @@ export class AppComponent implements OnInit, AfterViewInit {
       }
     }));
 
-    const edgeElements = (this.relations ?? []).map((r: any) => ({
-      data: {
-        id: `relation-${r.id}`,
-        source: `skill-${r.from_node_id}`,
-        target: `skill-${r.to_node_id}`,
-        relation_type: r.relation_type,
-        strength: r.strength,
-        context: r.context
-      }
-    }));
+    const edgeElements = (this.relations ?? [])
+      .map((r: any) => {
+        const from = r.from_node_id ?? r.from_node?.id;
+        const to = r.to_node_id ?? r.to_node?.id;
+        if (from == null || to == null) return null;
+        return {
+          data: {
+            id: `relation-${r.id}`,
+            source: `skill-${from}`,
+            target: `skill-${to}`,
+            relation_type: r.relation_type,
+            strength: r.strength,
+            context: r.context
+          }
+        };
+      })
+      .filter((el): el is { data: any } => !!el);
 
     this.elements = [...nodeElements, ...edgeElements];
 
@@ -782,6 +901,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
 
     this.refreshTableRows();
+    this.refreshSelectedConnections();
   }
 
   private resolveSkillNameById(id: number | null | undefined) {
@@ -790,10 +910,37 @@ export class AppComponent implements OnInit, AfterViewInit {
     return skill?.name ?? '';
   }
 
+  private extractSkillId(raw: any): number | null {
+    const str = String(raw ?? '');
+    const match = str.match(/(\d+)/);
+    return match ? Number(match[1]) : null;
+  }
+
   private async pushSkillToState(skill: any) {
     this.skills.push(skill);
     await this.ensureCategoryColor(skill.category);
     this.rebuildElementsFromSkills();
+  }
+
+  private async createRelation(fromId: number, toId: number, relation_type: string, strength: number) {
+    const payload = {
+      from_node_id: fromId,
+      to_node_id: toId,
+      relation_type,
+      strength
+    };
+    const res = await axios.post(`${environment.apiUrl}/relations/`, payload);
+    const created = res.data ?? { ...payload, id: Date.now() };
+    const normalized = {
+      id: created.id ?? Date.now(),
+      from_node_id: created.from_node_id ?? created.from_node ?? fromId,
+      to_node_id: created.to_node_id ?? created.to_node ?? toId,
+      relation_type: created.relation_type ?? relation_type,
+      strength: created.strength ?? strength
+    };
+    this.relations = [...this.relations, normalized];
+    this.rebuildElementsFromSkills();
+    return normalized.id;
   }
 
   async createSkill() {
@@ -804,19 +951,10 @@ export class AppComponent implements OnInit, AfterViewInit {
     const name = this.newSkill.name.trim();
     const category = this.newSkill.category.trim();
     const level = Number(this.newSkill.level);
-    const parentName = this.newSkill.parentName.trim();
     const errors: string[] = [];
 
     if (!name) errors.push('名前を入力してください');
     if (!category) errors.push('カテゴリを入力してください');
-    const parentSkill =
-      parentName && this.skills
-        ? (this.skills ?? []).find(
-            (s: any) => (s?.name ?? s?.label ?? '').toLowerCase() === parentName.toLowerCase()
-          )
-        : null;
-
-    if (parentName && !parentSkill) errors.push('親ノードが存在しません');
     if (!Number.isFinite(level) || level < 0 || level > 5) errors.push('レベルは0-5の数値で入力してください');
 
     const nameExists = (this.skills ?? []).some(
@@ -841,10 +979,10 @@ export class AppComponent implements OnInit, AfterViewInit {
     const response = await axios.post(`${environment.apiUrl}/nodes/`, payload);
     const created = response.data;
     created.parent_id = null;
-    created.level = 0;
+    created.level = this.clampLevelValue(level);
     created.user_comment = '';
     await this.pushSkillToState(created);
-    this.newSkill = { name: '', category: '', level: 0, description: '', parent_id: null, parentName: '' };
+    this.newSkill = { name: '', category: '', level: 0, description: '' };
     this.newSkillNotice = 'ノードを追加しました';
   }
 
@@ -863,9 +1001,11 @@ export class AppComponent implements OnInit, AfterViewInit {
       );
     });
     this.skills = this.skills.filter((s: any) => Number(s.id) !== id);
-    this.relations = (this.relations ?? []).filter(
-      (r: any) => Number(r.from_node_id) !== id && Number(r.to_node_id) !== id
-    );
+    this.relations = (this.relations ?? []).filter((r: any) => {
+      const from = r.from_node_id ?? r.from_node?.id;
+      const to = r.to_node_id ?? r.to_node?.id;
+      return Number(from) !== id && Number(to) !== id;
+    });
     if (this.cy) {
       this.addElementsToCytoscape(this.elements);
     }
@@ -934,6 +1074,153 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.metadataSaveMessage = '保存しました';
     this.metadataSaveIsError = false;
     this.selectSkillById(skillId);
+  }
+
+  async addConnection() {
+    if (!this.editingMode || !this.selectedNode) return;
+    this.connectionError = '';
+    this.connectionNotice = '';
+
+    const baseId = this.getSelectedSkillId();
+    if (!baseId) {
+      this.connectionError = 'ノードを選択してください';
+      return;
+    }
+
+    const targetName = this.connectionForm.targetName.trim();
+    if (!targetName) {
+      this.connectionError = '接続先ノードを入力してください';
+      return;
+    }
+
+    const targetSkill = this.findSkillByName(targetName);
+    if (!targetSkill) {
+      this.connectionError = '接続先ノードが見つかりません';
+      return;
+    }
+
+    if (Number(targetSkill.id) === baseId) {
+      this.connectionError = '同じノード同士は接続できません';
+      return;
+    }
+
+    const direction = this.connectionForm.direction === 'incoming' ? 'incoming' : 'outgoing';
+    const relationType = this.connectionForm.relationType || 'prerequisite';
+    const strength = Math.max(0, Math.min(1, Number(this.connectionForm.strength ?? 0.5)));
+
+    const fromId = direction === 'outgoing' ? baseId : Number(targetSkill.id);
+    const toId = direction === 'outgoing' ? Number(targetSkill.id) : baseId;
+
+    const exists = (this.relations ?? []).some((r: any) => {
+      const from = r.from_node_id ?? r.from_node?.id;
+      const to = r.to_node_id ?? r.to_node?.id;
+      return Number(from) === fromId && Number(to) === toId;
+    });
+    if (exists) {
+      this.connectionError = '同じ接続が既に存在します';
+      return;
+    }
+
+    try {
+      await this.createRelation(fromId, toId, relationType, strength);
+      this.connectionError = '';
+      this.connectionNotice = '接続を追加しました';
+      this.connectionForm = { ...this.connectionForm, targetName: '' };
+      this.refreshSelectedConnections(baseId);
+    } catch (err) {
+      console.error('Failed to add connection', err);
+      this.connectionError = '接続の追加に失敗しました';
+    }
+  }
+
+  async updateConnection() {
+    if (!this.editingMode || !this.selectedNode) return;
+    if (!this.selectedConnectionId) {
+      this.connectionError = '更新する接続を選択してください';
+      return;
+    }
+
+    this.connectionError = '';
+    this.connectionNotice = '';
+
+    const baseId = this.getSelectedSkillId();
+    if (!baseId) {
+      this.connectionError = 'ノードを選択してください';
+      return;
+    }
+
+    const targetName = this.connectionForm.targetName.trim();
+    if (!targetName) {
+      this.connectionError = '接続先ノードを入力してください';
+      return;
+    }
+    const targetSkill = this.findSkillByName(targetName);
+    if (!targetSkill) {
+      this.connectionError = '接続先ノードが見つかりません';
+      return;
+    }
+    if (Number(targetSkill.id) === baseId) {
+      this.connectionError = '同じノード同士は接続できません';
+      return;
+    }
+
+    const direction = this.connectionForm.direction === 'incoming' ? 'incoming' : 'outgoing';
+    const relationType = this.connectionForm.relationType || 'prerequisite';
+    const strength = Math.max(0, Math.min(1, Number(this.connectionForm.strength ?? 0.5)));
+
+    const fromId = direction === 'outgoing' ? baseId : Number(targetSkill.id);
+    const toId = direction === 'outgoing' ? Number(targetSkill.id) : baseId;
+
+    const exists = (this.relations ?? []).some((r: any) => {
+      if (Number(r.id) === this.selectedConnectionId) return false;
+      const from = r.from_node_id ?? r.from_node?.id;
+      const to = r.to_node_id ?? r.to_node?.id;
+      return Number(from) === fromId && Number(to) === toId;
+    });
+    if (exists) {
+      this.connectionError = '同じ接続が既に存在します';
+      return;
+    }
+
+    try {
+      await axios.patch(`${environment.apiUrl}/relations/${this.selectedConnectionId}/`, {
+        from_node_id: fromId,
+        to_node_id: toId,
+        relation_type: relationType,
+        strength
+      });
+
+      this.relations = (this.relations ?? []).map((r: any) =>
+        Number(r.id) === this.selectedConnectionId
+          ? { ...r, from_node_id: fromId, to_node_id: toId, relation_type: relationType, strength }
+          : r
+      );
+
+      this.rebuildElementsFromSkills();
+      this.refreshSelectedConnections(baseId);
+      this.connectionNotice = '接続を更新しました';
+    } catch (err) {
+      console.error('Failed to update connection', err);
+      this.connectionError = '接続の更新に失敗しました';
+    }
+  }
+
+  async removeConnection(relationId: number) {
+    if (!this.editingMode) return;
+    this.connectionNotice = '';
+    const baseId = this.getSelectedSkillId();
+
+    try {
+      await axios.delete(`${environment.apiUrl}/relations/${relationId}/`);
+      this.relations = (this.relations ?? []).filter((r: any) => Number(r.id) !== Number(relationId));
+      this.rebuildElementsFromSkills();
+      this.refreshSelectedConnections();
+      this.connectionError = '';
+      this.connectionNotice = '接続を削除しました';
+    } catch (err) {
+      console.error('Failed to remove connection', err);
+      this.connectionError = '接続の削除に失敗しました';
+    }
   }
 
   async saveCategoryColor() {
@@ -1172,10 +1459,14 @@ export class AppComponent implements OnInit, AfterViewInit {
     this.editedComment = '';
     this.saveMessage = '';
     this.saveError = false;
-    this.selectedParentName = '';
     this.selectedCategoryName = '';
     this.metadataSaveMessage = '';
     this.metadataSaveIsError = false;
+    this.selectedConnections = [];
+    this.connectionError = '';
+    this.connectionNotice = '';
+    this.selectedConnectionId = null;
+    this.resetConnectionForm();
     // ensure UI immediately reflects cleared state
     this.ngZone.run(() => this.cdr.detectChanges());
   }
@@ -1267,12 +1558,16 @@ export class AppComponent implements OnInit, AfterViewInit {
       this.selectedComment = nodeData.user_comment ?? '';
       this.editedComment = this.selectedComment;
       this.selectedCategoryName = nodeData.category ?? '';
-      this.selectedParentName = this.resolveSkillNameById(nodeData.parent_id);
       this.metadataSaveMessage = '';
       this.metadataSaveIsError = false;
       this.saveMessage = '';
       this.saveError = false;
       this.sidebarCollapsed = false;
+      this.connectionError = '';
+      this.connectionNotice = '';
+      this.selectedConnectionId = null;
+      this.resetConnectionForm();
+      this.refreshSelectedConnections(skillId);
       this.cdr.detectChanges();
     });
   }
