@@ -1,7 +1,7 @@
 # TechTree — ドキュメント
 
 ## 概要
-TechTree はスキル間の依存関係を可視化する Web アプリケーションです。  
+TechTree は技術ノード間の関係（ノード + エッジ）を可視化する Web アプリケーションです。
 フロントエンドは Angular + Cytoscape.js、バックエンドは Django REST Framework を使用しています。
 
 ## 関連 OSS / ライブラリ
@@ -26,8 +26,11 @@ TechTree はスキル間の依存関係を可視化する Web アプリケーシ
   - src/app/app.css / src/styles.css — UI スタイル
   - src/app/app.html — ヘッダー・検索・サイドバー・cy コンテナ（#cy）
 - バックエンド
-  - skills アプリ: skills/models.py（Skill モデル）、skills/views/…（API）
+  - skills アプリ: skills/models.py（Node / Relation モデルと API）
   - backend/settings.py — DB / CORS / INSTALLED_APPS 等
+
+## データモデルメモ
+- グラフ型の技術知識モデルの方針は `docs/GRAPH_MODEL.md` を参照してください（nodes / relations テーブル、relation_type / strength / context など）。
 
 ## 画面機能（ユーザー視点）
 - ヘッダー
@@ -36,7 +39,6 @@ TechTree はスキル間の依存関係を可視化する Web アプリケーシ
 - メイン
   - Cytoscape によるノード/エッジ表示
   - ノードをクリックすると詳細がサイドバーに表示
-  - レベルノード（Lv.N）は視覚的に小さく、親ノードの「ラベル」扱い
 - サイドバー
   - 選択ノードの Label / Category / Level を表示
   - 折りたたみ可能
@@ -68,7 +70,7 @@ TechTree はスキル間の依存関係を可視化する Web アプリケーシ
   - pip install -r requirements.txt
   - python manage.py runserver
 - API
-  - フロントはデフォルトで `http://localhost:8000/skills/` を参照
+- フロントはデフォルトで `http://localhost:8000/nodes/` / `http://localhost:8000/relations/` を参照
 
 ## テスト
 - 単体テスト: `ng test`（Vitest / Angular のセットアップに依存）
@@ -89,10 +91,8 @@ TechTree はスキル間の依存関係を可視化する Web アプリケーシ
 目的: シンプルな箇条書きにしておき、議論・実装へつなげやすくします。  
 例やテンプレートは `docs/IDEAS.md` を参照してください。
 
-## Backend API (Draft)
-API はまだ実装されていませんが、フロントエンドは下記の API 仕様を前提に動作します。実装時は `docs/API.md` を参照してください（`GET /skills/`, `PATCH /skills/{id}/` など）。
-- Spec: docs/API.md
-- Note: `PATCH /skills/{id}/` は Details の level 編集で使用します（`{ "level": <number> }`）。
+## Backend API
+API の仕様は `docs/API.md` を参照してください（nodes / relations）。
 
 ## Database setup (追加)
 簡易セットアップスクリプトを追加しました: `scripts/db/setup_db.sh`
@@ -105,4 +105,4 @@ API はまだ実装されていませんが、フロントエンドは下記の 
 - ユーザ名 / DB / パスワードを上書きしたい場合
   - DB_USER=myuser DB_PASSWORD=mypass DB_NAME=mydb ./scripts/db/setup_db.sh
 
-スクリプトは idempotent（既存のロール・DB があれば作成をスキップ）で、スキーマ・テーブル（`techtree.skills`）と簡易シードを作成します。
+スクリプトは idempotent（既存のロール・DB があれば作成をスキップ）で、スキーマ・テーブル（`techtree.nodes` / `techtree.relations`）とシードを作成します。

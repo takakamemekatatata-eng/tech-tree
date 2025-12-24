@@ -36,4 +36,4 @@
 - Summary: ノード選択時にLevel変更機能を持たせるDetail欄で実施する
 - Rationale / Benefit: ユーザーが画面から任意の項目のレベルを容易に変更できるようになる
 - Estimate: 1-2h
-- Notes: 実装ファイル — `src/app/app.html`, `src/app/app.ts`, `src/app/app.css`。保存は `PATCH /skills/<id>/` に対して行う想定（backend 側に該当エンドポイントが必要）。
+- Notes: 実装ファイル — `src/app/app.html`, `src/app/app.ts`, `src/app/app.css`。現在はグラフ用ノード/リレーションAPIのみ公開しており、旧 `PATCH /skills/<id>/` は廃止済み。

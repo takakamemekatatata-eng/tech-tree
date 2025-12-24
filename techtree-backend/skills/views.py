@@ -1,37 +1,44 @@
-from rest_framework import viewsets, mixins, status
+from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 
-from .models import Skill, Category
-from .serializers import SkillSerializer, CategorySerializer
+from .models import Node, Relation
+from .serializers import NodeSerializer, RelationSerializer
 
 
-class SkillViewSet(viewsets.ModelViewSet):
-    """
-    CRUD endpoint for skills.
-    """
+class NodeViewSet(viewsets.ModelViewSet):
+    """CRUD endpoint for technology nodes."""
 
-    queryset = Skill.objects.all().order_by('id')
-    serializer_class = SkillSerializer
+    queryset = Node.objects.all().order_by('id')
+    serializer_class = NodeSerializer
     permission_classes = [AllowAny]
 
-    def partial_update(self, request, *args, **kwargs):
-        """
-        Allow partial update but restrict level to 0-5.
-        """
-        data = request.data or {}
-        if 'level' in data:
+
+class RelationViewSet(viewsets.ModelViewSet):
+    """CRUD endpoint for relations between nodes."""
+
+    queryset = Relation.objects.select_related('from_node', 'to_node').all().order_by('id')
+    serializer_class = RelationSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        relation_type = self.request.query_params.get('relation_type')
+        min_strength = self.request.query_params.get('min_strength')
+        max_strength = self.request.query_params.get('max_strength')
+        context = self.request.query_params.get('context')
+
+        if relation_type:
+            queryset = queryset.filter(relation_type=relation_type)
+        if min_strength is not None:
             try:
-                level = int(data['level'])
-            except Exception:
-                return Response({'level': ['Must be an integer.']}, status=status.HTTP_400_BAD_REQUEST)
-            if level < 0 or level > 5:
-                return Response({'level': ['Must be between 0 and 5.']}, status=status.HTTP_400_BAD_REQUEST)
-        return super().partial_update(request, *args, **kwargs)
-
-
-class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all().order_by('id')
-    serializer_class = CategorySerializer
-    permission_classes = [AllowAny]
-    lookup_field = 'id'
+                queryset = queryset.filter(strength__gte=float(min_strength))
+            except ValueError:
+                pass
+        if max_strength is not None:
+            try:
+                queryset = queryset.filter(strength__lte=float(max_strength))
+            except ValueError:
+                pass
+        if context:
+            queryset = queryset.filter(context=context)
+        return queryset

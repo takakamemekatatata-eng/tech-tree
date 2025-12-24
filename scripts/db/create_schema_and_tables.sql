@@ -4,23 +4,25 @@
 CREATE SCHEMA IF NOT EXISTS techtree AUTHORIZATION CURRENT_USER;
 SET search_path = techtree, public;
 
-CREATE TABLE IF NOT EXISTS categories (
+CREATE TABLE IF NOT EXISTS nodes (
   id BIGSERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE,
-  color VARCHAR(16) NOT NULL DEFAULT '#4a5568'
+  name VARCHAR(150) NOT NULL UNIQUE,
+  node_type VARCHAR(50) NOT NULL DEFAULT 'technology',
+  category VARCHAR(100) NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  tags TEXT[] NOT NULL DEFAULT '{}'
 );
 
-CREATE TABLE IF NOT EXISTS skills (
+CREATE TABLE IF NOT EXISTS relations (
   id BIGSERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  level INTEGER NOT NULL DEFAULT 0,
-  category_id BIGINT REFERENCES categories(id) ON DELETE SET NULL,
-  parent_id BIGINT REFERENCES skills(id) ON DELETE SET NULL,
-  description TEXT NOT NULL DEFAULT 'スキルの説明は準備中です。',
-  user_comment TEXT NOT NULL DEFAULT ''
+  from_node_id BIGINT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  to_node_id BIGINT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+  relation_type VARCHAR(50) NOT NULL,
+  strength NUMERIC(3,2) NOT NULL DEFAULT 0.50 CHECK (strength >= 0.0 AND strength <= 1.0),
+  context VARCHAR(100)
 );
 
--- helpful indexes
-CREATE INDEX IF NOT EXISTS skills_parent_id_idx ON techtree.skills(parent_id);
-CREATE INDEX IF NOT EXISTS skills_category_id_idx ON techtree.skills(category_id);
-CREATE INDEX IF NOT EXISTS skills_name_idx ON techtree.skills(LOWER(name));
+CREATE INDEX IF NOT EXISTS relations_from_node_id_idx ON techtree.relations(from_node_id);
+CREATE INDEX IF NOT EXISTS relations_to_node_id_idx ON techtree.relations(to_node_id);
+CREATE INDEX IF NOT EXISTS relations_relation_type_idx ON techtree.relations(relation_type);
+CREATE INDEX IF NOT EXISTS relations_context_idx ON techtree.relations(context);

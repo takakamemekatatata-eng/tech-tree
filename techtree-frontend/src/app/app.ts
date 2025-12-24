@@ -37,6 +37,7 @@ export class AppComponent implements OnInit, AfterViewInit {
   // table / view state
   viewMode: 'graph' | 'table' = 'graph';
   skills: any[] = [];
+  relations: any[] = [];
   filteredTableRows: any[] = [];
   sortState: {
     column: 'label' | 'category' | 'level' | 'user_comment' | 'description';
@@ -87,18 +88,18 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   async ngOnInit() {
     try {
-      const [categoryRes, skillRes] = await Promise.all([
-        axios.get(`${environment.apiUrl}/categories/`).catch(() => ({ data: [] })),
-        axios.get(`${environment.apiUrl}/skills/`)
+      const [nodeRes, relationRes] = await Promise.all([
+        axios.get(`${environment.apiUrl}/nodes/`),
+        axios.get(`${environment.apiUrl}/relations/`)
       ]);
-      const skills = skillRes.data;
-      const categories = categoryRes.data ?? [];
-      this.categoryList = categories;
-      this.categoryColors = categories.reduce((map: Record<string, string>, c: any) => {
-        map[c.name] = c.color;
-        return map;
-      }, {} as Record<string, string>);
-      console.log('skills fetched', skills?.length);
+      const skills = (nodeRes.data ?? []).map((n: any) => ({
+        ...n,
+        level: n.level ?? 0,
+        user_comment: n.user_comment ?? '',
+        parent_id: null
+      }));
+      this.relations = relationRes.data ?? [];
+      console.log('nodes fetched', skills?.length, 'relations fetched', this.relations?.length);
 
       this.skills = skills ?? [];
       this.rebuildElementsFromSkills();
@@ -731,6 +732,20 @@ export class AppComponent implements OnInit, AfterViewInit {
   }
 
   private rebuildElementsFromSkills() {
+    // refresh categories/colors from current nodes
+    const previousColors = { ...this.categoryColors };
+    this.categoryColors = {};
+    (this.skills ?? []).forEach((s: any) => {
+      if (!this.categoryColors[s.category]) {
+        this.categoryColors[s.category] = previousColors[s.category] ?? this.generateRandomColor();
+      }
+    });
+    this.categoryList = Object.entries(this.categoryColors).map(([name, color], idx) => ({
+      id: idx + 1,
+      name,
+      color
+    }));
+
     const nodeElements = (this.skills ?? []).map((s: any) => ({
       data: {
         id: `skill-${s.id}`,
@@ -738,33 +753,24 @@ export class AppComponent implements OnInit, AfterViewInit {
         category: s.category,
         color: this.categoryColors[s.category] ?? '#d1d5db',
         level: s.level,
-        parent_id: s.parent_id,
         description: s.description,
-        user_comment: s.user_comment
+        user_comment: s.user_comment,
+        tags: s.tags ?? []
       }
     }));
 
-    const levelNodes = (this.skills ?? []).map((s: any) => ({
+    const edgeElements = (this.relations ?? []).map((r: any) => ({
       data: {
-        id: `skill-${s.id}-level`,
-        label: this.levelToStars(s.level),
-        level: s.level,
-        attachedTo: `skill-${s.id}`
-      },
-      classes: 'level-node'
+        id: `relation-${r.id}`,
+        source: `skill-${r.from_node_id}`,
+        target: `skill-${r.to_node_id}`,
+        relation_type: r.relation_type,
+        strength: r.strength,
+        context: r.context
+      }
     }));
 
-    const edgeElements = (this.skills ?? [])
-      .filter((s: any) => s.parent_id !== null && s.parent_id !== undefined && s.parent_id !== s.id)
-      .map((s: any) => ({
-        data: {
-          id: `edge-${s.parent_id}-${s.id}`,
-          source: `skill-${s.parent_id}`,
-          target: `skill-${s.id}`
-        }
-      }));
-
-    this.elements = [...nodeElements, ...levelNodes, ...edgeElements];
+    this.elements = [...nodeElements, ...edgeElements];
 
     this.refreshCategoryOptionsFromState();
     this.refreshLevelOptionsFromSkills();
@@ -826,16 +832,17 @@ export class AppComponent implements OnInit, AfterViewInit {
     const payload = {
       name,
       category,
-      level: this.clampLevelValue(level),
       description: this.newSkill.description ?? '',
-      user_comment: '',
-      parent: parentSkill ? parentSkill.id : null
+      tags: [] as string[],
+      node_type: 'technology'
     };
 
     await this.ensureCategoryColor(category);
-    const response = await axios.post(`${environment.apiUrl}/skills/`, payload);
+    const response = await axios.post(`${environment.apiUrl}/nodes/`, payload);
     const created = response.data;
-    created.parent_id = created.parent_id ?? parentSkill?.id ?? null;
+    created.parent_id = null;
+    created.level = 0;
+    created.user_comment = '';
     await this.pushSkillToState(created);
     this.newSkill = { name: '', category: '', level: 0, description: '', parent_id: null, parentName: '' };
     this.newSkillNotice = 'ノードを追加しました';
@@ -846,7 +853,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     const match = String(this.selectedNode.id ?? '').match(/^skill-(\d+)$/);
     if (!match) return;
     const id = Number(match[1]);
-    await axios.delete(`${environment.apiUrl}/skills/${id}/`);
+    await axios.delete(`${environment.apiUrl}/nodes/${id}/`);
     this.elements = this.elements.filter((el) => {
       return !(
         (el.data?.id && String(el.data.id) === `skill-${id}`) ||
@@ -856,6 +863,9 @@ export class AppComponent implements OnInit, AfterViewInit {
       );
     });
     this.skills = this.skills.filter((s: any) => Number(s.id) !== id);
+    this.relations = (this.relations ?? []).filter(
+      (r: any) => Number(r.from_node_id) !== id && Number(r.to_node_id) !== id
+    );
     if (this.cy) {
       this.addElementsToCytoscape(this.elements);
     }
@@ -868,7 +878,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     const match = String(this.selectedNode.id ?? '').match(/^skill-(\d+)$/);
     if (!match) return;
     const id = Number(match[1]);
-    await axios.patch(`${environment.apiUrl}/skills/${id}/`, { description: this.selectedNode.description ?? '' });
+    await axios.patch(`${environment.apiUrl}/nodes/${id}/`, { description: this.selectedNode.description ?? '' });
     const target = this.skills.find((s: any) => Number(s.id) === id);
     if (target) target.description = this.selectedNode.description;
     this.refreshTableRows();
@@ -888,18 +898,9 @@ export class AppComponent implements OnInit, AfterViewInit {
 
     const skillId = Number(match[1]);
     const category = this.selectedCategoryName.trim();
-    const parentName = this.selectedParentName.trim();
 
     const errors: string[] = [];
     if (!category) errors.push('カテゴリを入力してください');
-
-    const parentSkill = parentName
-      ? (this.skills ?? []).find(
-          (s: any) => (s?.name ?? s?.label ?? '').toLowerCase() === parentName.toLowerCase()
-        )
-      : null;
-
-    if (parentName && !parentSkill) errors.push('親ノードが存在しません');
 
     if (errors.length > 0) {
       this.metadataSaveMessage = errors.join(' / ');
@@ -910,11 +911,6 @@ export class AppComponent implements OnInit, AfterViewInit {
     const payload: any = {};
     if (category && category !== this.selectedNode.category) payload.category = category;
 
-    const parentId = parentSkill ? parentSkill.id : null;
-    if (parentName || this.selectedNode.parent_id) {
-      payload.parent = parentSkill ? parentId : null;
-    }
-
     if (Object.keys(payload).length === 0) {
       this.metadataSaveMessage = '変更がありません';
       this.metadataSaveIsError = false;
@@ -922,18 +918,16 @@ export class AppComponent implements OnInit, AfterViewInit {
     }
 
     await this.ensureCategoryColor(category);
-    await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, payload);
+    await axios.patch(`${environment.apiUrl}/nodes/${skillId}/`, payload);
 
     const target = (this.skills ?? []).find((s: any) => Number(s.id) === skillId);
     if (target) {
       if (payload.category) target.category = payload.category;
-      if ('parent' in payload) target.parent_id = payload.parent;
     }
 
     this.selectedNode = {
       ...this.selectedNode,
-      category: payload.category ?? this.selectedNode.category,
-      parent_id: 'parent' in payload ? payload.parent : this.selectedNode.parent_id
+      category: payload.category ?? this.selectedNode.category
     } as any;
 
     this.rebuildElementsFromSkills();
@@ -951,11 +945,9 @@ export class AppComponent implements OnInit, AfterViewInit {
   private async saveCategoryColorInternal(name: string, color: string) {
     const existing = this.categoryList.find((c) => c.name === name);
     if (existing) {
-      await axios.put(`${environment.apiUrl}/categories/${existing.id}/`, { name, color });
       existing.color = color;
     } else {
-      const res = await axios.post(`${environment.apiUrl}/categories/`, { name, color });
-      this.categoryList.push(res.data);
+      this.categoryList.push({ id: Date.now(), name, color });
     }
     this.categoryColors[name] = color;
     this.cy?.nodes(`[category = "${name}"]`).forEach((n: any) => n.data('color', color));
@@ -1382,13 +1374,20 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   private async saveSkill(
     skillId: number,
-    payload: { level?: number; user_comment?: string },
+    payload: { level?: number; user_comment?: string; description?: string; category?: string; tags?: string[] },
     originalLevel?: number
   ) {
     if (!payload || Object.keys(payload).length === 0) return;
   
-    await axios.patch(`${environment.apiUrl}/skills/${skillId}/`, payload);
-  
+    const allowedPayload: any = {};
+    if (payload.description !== undefined) allowedPayload.description = payload.description;
+    if (payload.category !== undefined) allowedPayload.category = payload.category;
+    if (payload.tags !== undefined) allowedPayload.tags = payload.tags;
+
+    if (Object.keys(allowedPayload).length > 0) {
+      await axios.patch(`${environment.apiUrl}/nodes/${skillId}/`, allowedPayload);
+    }
+
     this.applySkillChanges(skillId, payload);
   
     // options更新（ここでは applyFilters は呼ばない）
