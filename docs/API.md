@@ -15,10 +15,10 @@ Endpoints
       - node_type: string (default `technology`)
       - category: string
       - description: string
-      - tags: string[]
+      - level: number (0〜5)
 
 - GET /relations/
-  - Description: ノード間の関係を取得。`relation_type`、`min_strength`、`max_strength`、`context` でフィルタ可能。
+  - Description: ノード間の関係を取得。`relation_type`、`min_strength`、`max_strength` でフィルタ可能。
   - Response: 200 OK
   - Body: JSON array of relation objects
     - relation object fields:
@@ -27,7 +27,6 @@ Endpoints
       - to_node_id: integer
       - relation_type: string (`prerequisite`, `used_with`, `alternative`, `related`, `built_on`)
       - strength: number (0.0〜1.0)
-      - context: string | null
 
 - POST /nodes/ (管理用)
   - Description: 新しい技術ノードを作成（本番 UI からは利用しない）
@@ -43,3 +42,4 @@ Notes
 Change log
 - 2025-12-17: Draft created to match frontend expectations (level editing in details UI).
 - 2025-12-18: Updated to graph-only API (nodes / relations)。
+- 2025-12-19: Documented `level` field on nodes and removed unused `context` / `tags` references to align with current backend。

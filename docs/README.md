@@ -33,7 +33,7 @@ TechTree は技術ノード間の関係（ノード + エッジ）を可視化�
   - backend/settings.py — DB / CORS / INSTALLED_APPS 等
 
 ## データモデルメモ
-- グラフ型の技術知識モデルの方針は `docs/GRAPH_MODEL.md` を参照してください（nodes / relations テーブル、relation_type / strength / context など）。
+- グラフ型の技術知識モデルの方針は `docs/GRAPH_MODEL.md` を参照してください（nodes / relations テーブル、relation_type / strength / level など）。
 
 ## 画面機能（ユーザー視点）
 - ヘッダー
