@@ -1,8 +1,11 @@
+from django.db import transaction
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 
-from .models import Node, Relation
-from .serializers import NodeSerializer, RelationSerializer
+from .models import CardSelection, Node, Relation
+from .serializers import CardSelectionSerializer, NodeSerializer, RelationSerializer
 
 
 class NodeViewSet(viewsets.ModelViewSet):
@@ -39,3 +42,24 @@ class RelationViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
         return queryset
+
+
+class CardSelectionViewSet(viewsets.ModelViewSet):
+    queryset = CardSelection.objects.select_related('node').all().order_by('position', 'id')
+    serializer_class = CardSelectionSerializer
+    permission_classes = [AllowAny]
+
+    @action(detail=False, methods=['post'], url_path='bulk-save')
+    def bulk_save(self, request):
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+
+        with transaction.atomic():
+            CardSelection.objects.all().delete()
+            instances = [
+                CardSelection(node=item['node'], position=item.get('position', idx))
+                for idx, item in enumerate(serializer.validated_data)
+            ]
+            CardSelection.objects.bulk_create(instances)
+
+        return Response(self.get_serializer(CardSelection.objects.order_by('position', 'id'), many=True).data)

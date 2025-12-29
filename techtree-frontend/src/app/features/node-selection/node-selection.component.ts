@@ -24,14 +24,23 @@ export class NodeSelectionComponent implements OnInit {
   error = '';
   selectionError = '';
   exportError = '';
+  levelError = '';
   searchTerm = '';
   readonly maxSelectable = 12;
   exporting = false;
+  categoryFilter = 'all';
+  levelFilter: 'all' | '0' | '1' | '2' | '3' | '4' | '5' = 'all';
+  showSelectedOnly = false;
+  levelSavingIds = new Set<number>();
+  savingSelections = false;
+  selectionSaveQueued = false;
 
   constructor(private apiService: TechTreeApiService, private router: Router) { }
 
-  ngOnInit() {
-    this.loadSkills();
+  async ngOnInit() {
+    await this.loadSkills();
+    await this.loadCardSelections();
+    this.applyFilters();
   }
 
   async loadSkills() {
@@ -39,21 +48,36 @@ export class NodeSelectionComponent implements OnInit {
     this.error = '';
     try {
       const skills = await this.apiService.fetchSkills();
-      this.skills = (skills ?? [])
-        .map((skill) => ({ ...skill, level: skill.level ?? 0 }))
-        .sort((a, b) => {
-          if (b.level === a.level) {
-            return (a.name ?? a.label ?? '').localeCompare(b.name ?? b.label ?? '');
-          }
-          return (b.level ?? 0) - (a.level ?? 0);
-        });
-      this.filteredSkills = [...this.skills];
-      this.reconcileSelectedOrder();
+      this.skills = (skills ?? []).map((skill) => ({ ...skill, level: skill.level ?? 0 }));
+      this.sortSkills();
     } catch (err) {
       console.error('Failed to load skills', err);
       this.error = 'ノードの取得に失敗しました。時間をおいて再度お試しください。';
     } finally {
       this.loading = false;
+    }
+  }
+
+  async loadCardSelections() {
+    try {
+      const selections = await this.apiService.fetchCardSelections();
+      const availableIds = new Set(this.skills.map((s) => s.id));
+      const orderedIds = selections
+        .filter((selection) => availableIds.has(selection.node_id))
+        .sort((a, b) => {
+          if (a.position === b.position) {
+            return a.id - b.id;
+          }
+          return a.position - b.position;
+        })
+        .map((selection) => selection.node_id);
+
+      this.selectedSkillOrder = orderedIds;
+      this.selectedSkillIds = new Set(orderedIds);
+      this.reconcileSelectedOrder();
+    } catch (err) {
+      console.error('Failed to load saved selections', err);
+      this.selectionError = '保存済みのカード選択を読み込めませんでした。';
     }
   }
 
@@ -78,9 +102,12 @@ export class NodeSelectionComponent implements OnInit {
 
   toggleSelection(skill: Skill) {
     this.selectionError = '';
+    this.levelError = '';
     if (this.selectedSkillIds.has(skill.id)) {
       this.selectedSkillIds.delete(skill.id);
       this.selectedSkillOrder = this.selectedSkillOrder.filter((id) => id !== skill.id);
+      this.applyFilters();
+      void this.persistSelections();
       return;
     }
 
@@ -93,30 +120,115 @@ export class NodeSelectionComponent implements OnInit {
     if (!this.selectedSkillOrder.includes(skill.id)) {
       this.selectedSkillOrder = [...this.selectedSkillOrder, skill.id];
     }
+    this.applyFilters();
+    void this.persistSelections();
   }
 
   applySearch(term: string) {
     this.searchTerm = term;
-    const keyword = term.trim().toLowerCase();
-    if (!keyword) {
-      this.filteredSkills = [...this.skills];
-      return;
-    }
+    this.applyFilters();
+  }
+
+  setCategoryFilter(value: string) {
+    this.categoryFilter = value;
+    this.applyFilters();
+  }
+
+  setLevelFilter(value: string) {
+    const allowed: Array<'all' | '0' | '1' | '2' | '3' | '4' | '5'> = ['all', '0', '1', '2', '3', '4', '5'];
+    this.levelFilter = allowed.includes(value as any) ? (value as any) : 'all';
+    this.applyFilters();
+  }
+
+  toggleShowSelected(checked: boolean) {
+    this.showSelectedOnly = checked;
+    this.applyFilters();
+  }
+
+  applyFilters() {
+    const keyword = this.searchTerm.trim().toLowerCase();
+    const minLevel = this.levelFilter === 'all' ? 0 : Number(this.levelFilter);
+    const selectedOnly = this.showSelectedOnly;
+    const category = this.categoryFilter;
 
     this.filteredSkills = this.skills.filter((skill) => {
       const target = `${this.displayName(skill)} ${skill.category ?? ''}`.toLowerCase();
-      return target.includes(keyword);
+      const matchesSearch = keyword ? target.includes(keyword) : true;
+      const normalizedCategory = (skill.category ?? '').trim() || '未分類';
+      const matchesCategory = category === 'all' ? true : normalizedCategory === category;
+      const matchesLevel = (skill.level ?? 0) >= minLevel; // Lv0 も対象
+      const matchesSelection = selectedOnly ? this.isSelected(skill) : true;
+      return matchesSearch && matchesCategory && matchesLevel && matchesSelection;
     });
+  }
+
+  get categoryOptions(): string[] {
+    const categories = new Set<string>();
+    this.skills.forEach((skill) => {
+      const normalized = (skill.category ?? '').trim() || '未分類';
+      categories.add(normalized);
+    });
+    return Array.from(categories).sort((a, b) => a.localeCompare(b, 'ja'));
   }
 
   clearSelection() {
     this.selectedSkillIds.clear();
     this.selectedSkillOrder = [];
     this.selectionError = '';
+    this.applyFilters();
+    void this.persistSelections();
   }
 
   backToGraph() {
     this.router.navigate(['/']);
+  }
+
+  async persistSelections() {
+    if (this.savingSelections) {
+      this.selectionSaveQueued = true;
+      return;
+    }
+    this.savingSelections = true;
+    this.selectionError = '';
+    try {
+      const payload = this.selectedSkills.map((skill, index) => ({
+        node_id: skill.id,
+        position: index,
+      }));
+      await this.apiService.saveCardSelections(payload);
+    } catch (err) {
+      console.error('Failed to save card selections', err);
+      this.selectionError = 'カード選択の保存に失敗しました。';
+    } finally {
+      this.savingSelections = false;
+      if (this.selectionSaveQueued) {
+        this.selectionSaveQueued = false;
+        void this.persistSelections();
+      }
+    }
+  }
+
+  async updateSkillLevel(skill: Skill, levelValue: number) {
+    const normalizedLevel = Math.min(5, Math.max(0, Number(levelValue) || 0));
+    const target = this.skills.find((s) => s.id === skill.id);
+    if (!target || target.level === normalizedLevel) return;
+
+    this.levelSavingIds.add(skill.id);
+    this.levelError = '';
+    try {
+      await this.apiService.updateSkill(skill.id, { level: normalizedLevel });
+      target.level = normalizedLevel;
+      this.sortSkills();
+    } catch (err) {
+      console.error('Failed to update skill level', err);
+      this.levelError = 'レベルの更新に失敗しました。時間をおいて再度お試しください。';
+    } finally {
+      this.levelSavingIds.delete(skill.id);
+    }
+  }
+
+  onLevelInput(skill: Skill, value: string) {
+    this.updateSkillLevel(skill, Number(value));
   }
 
   async downloadCardsPng() {
@@ -238,6 +350,7 @@ export class NodeSelectionComponent implements OnInit {
 
   onCardDragEnd() {
     this.draggingCardId = null;
+    void this.persistSelections();
   }
 
   private reorderSelectedSkills(sourceId: number, targetId: number) {
@@ -249,5 +362,16 @@ export class NodeSelectionComponent implements OnInit {
     order.splice(fromIndex, 1);
     order.splice(toIndex, 0, sourceId);
     this.selectedSkillOrder = order;
+  }
+
+  private sortSkills() {
+    this.skills = [...this.skills].sort((a, b) => {
+      if (b.level === a.level) {
+        return (a.name ?? a.label ?? '').localeCompare(b.name ?? b.label ?? '', 'ja');
+      }
+      return (b.level ?? 0) - (a.level ?? 0);
+    });
+    this.applyFilters();
+    this.reconcileSelectedOrder();
   }
 }

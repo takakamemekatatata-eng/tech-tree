@@ -3,6 +3,7 @@ import axios from 'axios';
 import { environment } from '../../../../environments/environment';
 import { Skill } from '../../models/skill.model';
 import { Relation } from '../../models/relation.model';
+import { CardSelection } from '../../models/card-selection.model';
 
 @Injectable({ providedIn: 'root' })
 export class TechTreeApiService {
@@ -51,5 +52,15 @@ export class TechTreeApiService {
 
   async deleteRelation(relationId: number): Promise<void> {
     await axios.delete(`${environment.apiUrl}/relations/${relationId}/`);
+  }
+
+  async fetchCardSelections(): Promise<CardSelection[]> {
+    const response = await axios.get(`${environment.apiUrl}/card-selections/`);
+    return response.data ?? [];
+  }
+
+  async saveCardSelections(payload: { node_id: number; position: number }[]): Promise<CardSelection[]> {
+    const response = await axios.post(`${environment.apiUrl}/card-selections/bulk-save/`, payload);
+    return response.data ?? [];
   }
 }

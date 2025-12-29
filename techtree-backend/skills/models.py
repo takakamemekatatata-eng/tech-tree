@@ -51,3 +51,22 @@ class Relation(models.Model):
 
     def __str__(self):
         return f"{self.from_node} -> {self.to_node} ({self.relation_type})"
+
+
+class CardSelection(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    node = models.ForeignKey(Node, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'card_selections'
+        ordering = ['position', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['node'], name='unique_card_selection_node'),
+        ]
+
+    def __str__(self):
+        return f"{self.node} (#{self.position})"

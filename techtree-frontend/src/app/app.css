@@ -201,9 +201,7 @@ app-graph-view {
    Sidebar
    ========================= */
 .details {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  max-width: var(--sidebar-width);
+  width: 300px;
   flex-shrink: 0;
   padding: 12px;
   border-right: 1px solid #e9ecef;
@@ -426,6 +424,7 @@ app-graph-view {
 
 .detail-row {
   margin-bottom: 12px;
+  margin-right: 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
