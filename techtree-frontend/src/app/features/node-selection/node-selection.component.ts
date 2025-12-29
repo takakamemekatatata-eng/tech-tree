@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TechTreeApiService } from '../../core/services/api/tech-tree-api.service';
@@ -12,7 +12,7 @@ import { Skill } from '../../core/models/skill.model';
   templateUrl: './node-selection.component.html',
   styleUrls: ['./node-selection.component.css']
 })
-export class NodeSelectionComponent implements OnInit {
+export class NodeSelectionComponent implements OnInit, OnDestroy {
   @ViewChild('cardList') cardList?: ElementRef<HTMLDivElement>;
 
   skills: Skill[] = [];
@@ -32,10 +32,18 @@ export class NodeSelectionComponent implements OnInit {
   levelFilter: 'all' | '0' | '1' | '2' | '3' | '4' | '5' = 'all';
   showSelectedOnly = false;
   levelSavingIds = new Set<number>();
+  recentlySavedLevelIds = new Set<number>();
+  private levelSaveTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  private exportNoticeTimer?: ReturnType<typeof setTimeout>;
   savingSelections = false;
   selectionSaveQueued = false;
+  exportNotice = '';
 
-  constructor(private apiService: TechTreeApiService, private router: Router) { }
+  constructor(
+    private apiService: TechTreeApiService,
+    private router: Router,
+    private cdr: ChangeDetectorRef
+  ) { }
 
   async ngOnInit() {
     await this.loadSkills();
@@ -55,6 +63,8 @@ export class NodeSelectionComponent implements OnInit {
       this.error = 'ノードの取得に失敗しました。時間をおいて再度お試しください。';
     } finally {
       this.loading = false;
+      this.applyFilters();
+      this.cdr.detectChanges();
     }
   }
 
@@ -75,6 +85,8 @@ export class NodeSelectionComponent implements OnInit {
       this.selectedSkillOrder = orderedIds;
       this.selectedSkillIds = new Set(orderedIds);
       this.reconcileSelectedOrder();
+      this.applyFilters();
+      this.cdr.detectChanges();
     } catch (err) {
       console.error('Failed to load saved selections', err);
       this.selectionError = '保存済みのカード選択を読み込めませんでした。';
@@ -214,16 +226,26 @@ export class NodeSelectionComponent implements OnInit {
     if (!target || target.level === normalizedLevel) return;
 
     this.levelSavingIds.add(skill.id);
+    this.recentlySavedLevelIds.delete(skill.id);
     this.levelError = '';
     try {
-      await this.apiService.updateSkill(skill.id, { level: normalizedLevel });
+      await this.runWithTimeout(
+        this.apiService.updateSkill(skill.id, { level: normalizedLevel }),
+        8000,
+        'レベル更新がタイムアウトしました。'
+      );
       target.level = normalizedLevel;
       this.sortSkills();
+      this.markLevelSaved(skill.id);
     } catch (err) {
       console.error('Failed to update skill level', err);
-      this.levelError = 'レベルの更新に失敗しました。時間をおいて再度お試しください。';
+      this.levelError =
+        err instanceof Error && err.message
+          ? err.message
+          : 'レベルの更新に失敗しました。時間をおいて再度お試しください。';
     } finally {
       this.levelSavingIds.delete(skill.id);
+      this.cdr.detectChanges();
     }
   }
 
@@ -232,21 +254,31 @@ export class NodeSelectionComponent implements OnInit {
   }
 
   async downloadCardsPng() {
-    if (!this.cardList || this.selectedSkillIds.size === 0) return;
+    if (!this.cardList || this.selectedSkillIds.size === 0 || this.exporting) return;
 
     this.exporting = true;
     this.exportError = '';
+    this.exportNotice = '';
     try {
-      const dataUrl = await this.buildCardsPng(this.cardList.nativeElement);
+      const dataUrl = await this.runWithTimeout(
+        this.buildCardsPng(this.cardList.nativeElement),
+        15000,
+        'カード一覧のPNG生成がタイムアウトしました。'
+      );
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = 'selected-nodes.png';
       link.click();
+      this.setExportNotice('カードPNGの保存が完了しました。');
     } catch (err) {
       console.error('Failed to export cards', err);
-      this.exportError = 'カード一覧のPNG出力に失敗しました。';
+      this.exportError =
+        err instanceof Error && err.message
+          ? err.message
+          : 'カード一覧のPNG出力に失敗しました。';
     } finally {
       this.exporting = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -373,5 +405,52 @@ export class NodeSelectionComponent implements OnInit {
     });
     this.applyFilters();
     this.reconcileSelectedOrder();
+  }
+
+  private markLevelSaved(skillId: number) {
+    const timer = this.levelSaveTimers.get(skillId);
+    if (timer) {
+      clearTimeout(timer);
+    }
+    this.recentlySavedLevelIds.add(skillId);
+    const newTimer = setTimeout(() => {
+      this.recentlySavedLevelIds.delete(skillId);
+      this.levelSaveTimers.delete(skillId);
+      this.cdr.detectChanges();
+    }, 1500);
+    this.levelSaveTimers.set(skillId, newTimer);
+  }
+
+  private setExportNotice(message: string) {
+    if (this.exportNoticeTimer) {
+      clearTimeout(this.exportNoticeTimer);
+    }
+    this.exportNotice = message;
+    this.exportNoticeTimer = setTimeout(() => {
+      this.exportNotice = '';
+      this.exportNoticeTimer = undefined;
+      this.cdr.detectChanges();
+    }, 3000);
+  }
+
+  private async runWithTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    }
+  }
+
+  ngOnDestroy() {
+    this.levelSaveTimers.forEach((timer) => clearTimeout(timer));
+    if (this.exportNoticeTimer) {
+      clearTimeout(this.exportNoticeTimer);
+    }
   }
 }

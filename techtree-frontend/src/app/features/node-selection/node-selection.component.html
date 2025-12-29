@@ -86,6 +86,7 @@
               />
             </label>
             <span class="saving-indicator" *ngIf="levelSavingIds.has(skill.id)">更新中...</span>
+            <span class="saving-indicator success" *ngIf="recentlySavedLevelIds.has(skill.id)">保存済み</span>
           </div>
           <p class="option-desc">{{ skill.description || '説明が登録されていません。' }}</p>
         </div>
@@ -127,6 +128,7 @@
         <p class="card-desc">{{ skill.description || '説明が登録されていません。' }}</p>
       </article>
     </div>
+    <div class="status success" *ngIf="exportNotice">{{ exportNotice }}</div>
     <div class="status error" *ngIf="exportError">{{ exportError }}</div>
   </section>
 </div>
