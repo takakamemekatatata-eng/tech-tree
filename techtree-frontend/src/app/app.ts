@@ -1253,7 +1253,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     return sorted.map((skill) => ({ ...skill }));
   }
 
-  applyFilters(forceRelayout: boolean = false) {
+  applyFilters(forceRelayout: boolean = false, allowRelayout: boolean = true) {
     if (!this.cy) return;
    
     // options が未準備でも落ちないようにする（中間状態対策）
@@ -1267,12 +1267,14 @@ export class AppComponent implements OnInit, AfterViewInit {
     mainNodes.removeClass('searched faded');
     edges.removeClass('faded');
    
-    let needsRelayout = forceRelayout;
+    let needsRelayout = allowRelayout ? forceRelayout : false;
    
     const ensureDisplay = (ele: any, value: 'none' | 'element') => {
       if (ele.style('display') !== value) {
         ele.style('display', value);
-        needsRelayout = true;
+        if (allowRelayout) {
+          needsRelayout = true;
+        }
       }
     };
    
@@ -1583,7 +1585,7 @@ export class AppComponent implements OnInit, AfterViewInit {
     if (!Number.isFinite(v)) return;
     const nextLevel = Math.max(0, Math.min(5, Math.floor(v)));
     if (nextLevel === row.level) return;
-    this.saveSkill(Number(row.id), { level: nextLevel }, row.level).catch((err) =>
+    this.saveSkill(Number(row.id), { level: nextLevel }).catch((err) =>
       console.error('Failed to save level from table', err)
     );
   }
@@ -1638,8 +1640,7 @@ export class AppComponent implements OnInit, AfterViewInit {
 
   private async saveSkill(
     skillId: number,
-    payload: { level?: number; user_comment?: string; description?: string; category?: string },
-    originalLevel?: number
+    payload: { level?: number; user_comment?: string; description?: string; category?: string }
   ) {
     if (!payload || Object.keys(payload).length === 0) return;
   
@@ -1657,20 +1658,11 @@ export class AppComponent implements OnInit, AfterViewInit {
     // options更新（ここでは applyFilters は呼ばない）
     this.refreshLevelOptionsFromGraph();
   
-    const needsRelayout = payload.level != null && (payload.level === 0 || originalLevel === 0);
-  
-    // ここで1回だけ filter & relayout
-    this.applyFilters(needsRelayout);
-  
-    requestAnimationFrame(() => {
-      try {
-        if (this.cy) {
-          this.cy.resize();
-          this.fit();
-          this.positionLevelNodes();
-        }
-      } catch { /* ignore */ }
-    });
+    // レベル変更時はカードの表示位置を固定したままにするため、レイアウト更新は行わない
+    const needsRelayout = false;
+
+    // filter のみ適用（レイアウトはスキップ）
+    this.applyFilters(needsRelayout, false);
   }
 
   private async persistDetails(change: { level?: number; user_comment?: string }) {
@@ -1689,7 +1681,6 @@ export class AppComponent implements OnInit, AfterViewInit {
     const skillId = match[1];
   
     const payload: any = {};
-    const originalLevel = this.selectedNode.level;
   
     if (change.level != null && change.level !== this.selectedNode.level) payload.level = change.level;
     if (change.user_comment != null && change.user_comment !== this.selectedNode.user_comment) payload.user_comment = change.user_comment;
@@ -1704,7 +1695,7 @@ export class AppComponent implements OnInit, AfterViewInit {
         this.cdr.detectChanges();
       });
   
-      await this.saveSkill(Number(skillId), payload, originalLevel);
+      await this.saveSkill(Number(skillId), payload);
   
       this.ngZone.run(() => {
         this.isSavingDetails = false;

@@ -235,7 +235,8 @@ export class NodeSelectionComponent implements OnInit, OnDestroy {
         'レベル更新がタイムアウトしました。'
       );
       target.level = normalizedLevel;
-      this.sortSkills();
+      // 並び順は維持しつつ、フィルタのみ更新する
+      this.applyFilters();
       this.markLevelSaved(skill.id);
     } catch (err) {
       console.error('Failed to update skill level', err);
