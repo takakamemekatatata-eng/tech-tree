@@ -72,21 +72,25 @@
         <div class="option-body">
           <div class="option-title">{{ displayName(skill) }}</div>
           <div class="option-meta">
-            <span class="badge">Lv{{ skill.level }}</span>
-            <span class="badge light">{{ skill.category || '未分類' }}</span>
-            <label class="level-edit" (click)="$event.stopPropagation()">
-              <span class="level-edit-label">Lv編集</span>
-              <input
-                type="number"
-                min="0"
-                max="5"
-                [value]="skill.level"
-                [disabled]="levelSavingIds.has(skill.id)"
-                (input)="onLevelInput(skill, $any($event.target).value)"
-              />
-            </label>
-            <span class="saving-indicator" *ngIf="levelSavingIds.has(skill.id)">更新中...</span>
-            <span class="saving-indicator success" *ngIf="recentlySavedLevelIds.has(skill.id)">保存済み</span>
+            <div class="option-meta-top">
+              <span class="badge light">{{ skill.category || '未分類' }}</span>
+              <span class="badge">Lv{{ skill.level }}</span>
+            </div>
+            <div class="option-meta-actions">
+              <label class="level-edit" (click)="$event.stopPropagation()">
+                <span class="level-edit-label">Lv編集</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  [value]="skill.level"
+                  [disabled]="levelSavingIds.has(skill.id)"
+                  (input)="onLevelInput(skill, $any($event.target).value)"
+                />
+              </label>
+              <span class="saving-indicator" *ngIf="levelSavingIds.has(skill.id)">更新中...</span>
+              <span class="saving-indicator success" *ngIf="recentlySavedLevelIds.has(skill.id)">保存済み</span>
+            </div>
           </div>
           <p class="option-desc">{{ skill.description || '説明が登録されていません。' }}</p>
         </div>

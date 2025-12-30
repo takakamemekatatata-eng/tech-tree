@@ -206,7 +206,20 @@
 
 .option-meta {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option-meta-top {
+  display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.option-meta-actions {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
   align-items: center;
 }
