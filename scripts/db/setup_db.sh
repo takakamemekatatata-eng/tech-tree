@@ -8,7 +8,7 @@ PG_SUPERUSER_PASSWORD=${PG_SUPERUSER_PASSWORD:-}
 DB_NAME=${DB_NAME:-techtree}
 DB_USER=${DB_USER:-techtree_user}
 DB_PASSWORD=${DB_PASSWORD:-password}
-SEED=${SEED:-1}
+IMPORT_JSON=${IMPORT_JSON:-1}
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -36,11 +36,10 @@ echo "Applying schema and tables..."
 export PGPASSWORD="${DB_PASSWORD}"
 psql -U "${DB_USER}" -h "${PGHOST}" -p "${PGPORT}" -d "${DB_NAME}" -f "${DIR}/create_schema_and_tables.sql"
 
-
-if [ "${SEED}" -ne 0 ]; then
-  echo "Applying seed data..."
-  psql -U "${DB_USER}" -h "${PGHOST}" -p "${PGPORT}" -d "${DB_NAME}" -f "${DIR}/seed_test_data.sql"
+if [ "${IMPORT_JSON}" -ne 0 ]; then
+  echo "Importing data from JSON..."
+  DB_NAME="${DB_NAME}" DB_USER="${DB_USER}" DB_PASSWORD="${DB_PASSWORD}" PGHOST="${PGHOST}" PGPORT="${PGPORT}" \
+    "${DIR}/import_data.py"
 fi
 
 echo "✅ Database fully reset and initialized."
-

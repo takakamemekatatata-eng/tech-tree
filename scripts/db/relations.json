@@ -1,0 +1,92 @@
+[
+  {
+    "from_node": "Angular",
+    "to_node": "REST API",
+    "relation_type": "used_with",
+    "strength": 0.8
+  },
+  {
+    "from_node": "Apache",
+    "to_node": "Angular",
+    "relation_type": "prerequisite",
+    "strength": 0.5
+  },
+  {
+    "from_node": "Apache",
+    "to_node": "Django",
+    "relation_type": "prerequisite",
+    "strength": 0.5
+  },
+  {
+    "from_node": "CSS",
+    "to_node": "HTML",
+    "relation_type": "used_with",
+    "strength": 0.5
+  },
+  {
+    "from_node": "Django",
+    "to_node": "PostgreSQL",
+    "relation_type": "used_with",
+    "strength": 0.8
+  },
+  {
+    "from_node": "Flask",
+    "to_node": "Python",
+    "relation_type": "used_with",
+    "strength": 0.5
+  },
+  {
+    "from_node": "Git",
+    "to_node": "GitHub",
+    "relation_type": "used_with",
+    "strength": 0.5
+  },
+  {
+    "from_node": "HTTP",
+    "to_node": "HTTPS",
+    "relation_type": "built_on",
+    "strength": 0.5
+  },
+  {
+    "from_node": "MVC",
+    "to_node": "Angular",
+    "relation_type": "prerequisite",
+    "strength": 0.5
+  },
+  {
+    "from_node": "ORM",
+    "to_node": "Django",
+    "relation_type": "prerequisite",
+    "strength": 0.5
+  },
+  {
+    "from_node": "Python",
+    "to_node": "Django",
+    "relation_type": "prerequisite",
+    "strength": 0.9
+  },
+  {
+    "from_node": "SQL",
+    "to_node": "PostgreSQL",
+    "relation_type": "used_with",
+    "strength": 0.5
+  },
+  {
+    "from_node": "SQLite",
+    "to_node": "Python",
+    "relation_type": "prerequisite",
+    "strength": 0.5
+  },
+  {
+    "from_node": "TypeScript",
+    "to_node": "Angular",
+    "relation_type": "prerequisite",
+    "strength": 0.8
+  },
+  {
+    "from_node": "curl",
+    "to_node": "Linux",
+    "relation_type": "prerequisite",
+    "strength": 0.5
+  }
+]

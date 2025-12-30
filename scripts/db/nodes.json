@@ -1,0 +1,177 @@
+[
+  {
+    "name": "Angular",
+    "node_type": "technology",
+    "category": "framework",
+    "description": "Frontend framework.",
+    "level": 3
+  },
+  {
+    "name": "Apache",
+    "node_type": "technology",
+    "category": "tool",
+    "description": "Web server.",
+    "level": 3
+  },
+  {
+    "name": "CSS",
+    "node_type": "technology",
+    "category": "language",
+    "description": "Styling language for web.",
+    "level": 5
+  },
+  {
+    "name": "Django",
+    "node_type": "technology",
+    "category": "framework",
+    "description": "Python web framework.",
+    "level": 4
+  },
+  {
+    "name": "Elasticsearch",
+    "node_type": "technology",
+    "category": "database",
+    "description": "Search engine.",
+    "level": 3
+  },
+  {
+    "name": "Flask",
+    "node_type": "technology",
+    "category": "framework",
+    "description": "Lightweight Python web framework.",
+    "level": 3
+  },
+  {
+    "name": "Git",
+    "node_type": "technology",
+    "category": "tool",
+    "description": "Version control system.",
+    "level": 5
+  },
+  {
+    "name": "GitHub",
+    "node_type": "technology",
+    "category": "tool",
+    "description": "Git hosting platform.",
+    "level": 4
+  },
+  {
+    "name": "HTML",
+    "node_type": "technology",
+    "category": "language",
+    "description": "Markup language for web.",
+    "level": 5
+  },
+  {
+    "name": "HTTP",
+    "node_type": "technology",
+    "category": "protocol",
+    "description": "Hypertext Transfer Protocol.",
+    "level": 4
+  },
+  {
+    "name": "HTTPS",
+    "node_type": "technology",
+    "category": "protocol",
+    "description": "Secure HTTP.",
+    "level": 4
+  },
+  {
+    "name": "Linux",
+    "node_type": "technology",
+    "category": "os",
+    "description": "Operating system.",
+    "level": 5
+  },
+  {
+    "name": "MVC",
+    "node_type": "technology",
+    "category": "concept",
+    "description": "Model View Controller.",
+    "level": 4
+  },
+  {
+    "name": "ORM",
+    "node_type": "technology",
+    "category": "concept",
+    "description": "Object Relational Mapping.",
+    "level": 4
+  },
+  {
+    "name": "PostgreSQL",
+    "node_type": "technology",
+    "category": "database",
+    "description": "Open source RDBMS.",
+    "level": 4
+  },
+  {
+    "name": "Python",
+    "node_type": "technology",
+    "category": "language",
+    "description": "General-purpose programming language.",
+    "level": 5
+  },
+  {
+    "name": "REST API",
+    "node_type": "technology",
+    "category": "design",
+    "description": "RESTful API design.",
+    "level": 4
+  },
+  {
+    "name": "SQL",
+    "node_type": "technology",
+    "category": "language",
+    "description": "Relational query language.",
+    "level": 4
+  },
+  {
+    "name": "SQLite",
+    "node_type": "technology",
+    "category": "database",
+    "description": "Embedded database.",
+    "level": 4
+  },
+  {
+    "name": "Shell",
+    "node_type": "technology",
+    "category": "language",
+    "description": "Command-line scripting.",
+    "level": 4
+  },
+  {
+    "name": "TypeScript",
+    "node_type": "technology",
+    "category": "language",
+    "description": "Typed superset of JavaScript.",
+    "level": 4
+  },
+  {
+    "name": "Ubuntu",
+    "node_type": "technology",
+    "category": "os",
+    "description": "Linux distribution.",
+    "level": 4
+  },
+  {
+    "name": "VS Code",
+    "node_type": "technology",
+    "category": "tool",
+    "description": "Code editor.",
+    "level": 5
+  },
+  {
+    "name": "WSL",
+    "node_type": "technology",
+    "category": "tool",
+    "description": "Windows Subsystem for Linux.",
+    "level": 4
+  },
+  {
+    "name": "curl",
+    "node_type": "technology",
+    "category": "tool",
+    "description": "Command-line HTTP client.",
+    "level": 3
+  }
+]
