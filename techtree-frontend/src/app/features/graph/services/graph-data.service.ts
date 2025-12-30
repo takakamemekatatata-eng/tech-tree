@@ -79,11 +79,17 @@ export class GraphDataService {
     return categoryColors[category];
   }
 
+  /**
+   * Generates a bright-ish random color (range 80-235 per channel) to keep nodes legible.
+   */
   private generateRandomColor() {
     const component = () => Math.floor(Math.random() * 156 + 80).toString(16).padStart(2, '0');
     return `#${component()}${component()}${component()}`;
   }
 
+  /**
+   * Converts numeric level (0-5) to star symbols to reuse in Cytoscape label rendering.
+   */
   private levelToStars(level: number | string | null | undefined) {
     const l = Math.max(0, Math.min(5, Number(level) || 0));
     return l === 0 ? '☆' : '★'.repeat(l);
