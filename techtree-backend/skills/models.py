@@ -19,7 +19,6 @@ class Node(models.Model):
     )
 
     class Meta:
-        managed = False
         db_table = 'nodes'
 
     def __str__(self):
@@ -46,7 +45,6 @@ class Relation(models.Model):
     strength = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(1.0)], default=0.5)
 
     class Meta:
-        managed = False
         db_table = 'relations'
 
     def __str__(self):
@@ -61,7 +59,6 @@ class CardSelection(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
         db_table = 'card_selections'
         ordering = ['position', 'id']
         constraints = [
