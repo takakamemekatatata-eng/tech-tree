@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -84,17 +86,14 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'techtree',
-        'USER': 'techtree_user',
-        'PASSWORD': 'password',
-        'HOST': 'localhost',
-        'PORT': '5432',
-        'OPTIONS': {
-            'options': '-c search_path=techtree,public'
-        },
-    }
+    'default': dj_database_url.config(
+        default='postgresql://techtree_user:password@localhost:5432/techtree',
+        conn_max_age=600,
+    )
+}
+
+DATABASES['default']['OPTIONS'] = {
+    'options': '-c search_path=techtree,public'
 }
 
 
